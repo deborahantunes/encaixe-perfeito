@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "title": "Encaixe Molecular VR",
+  "description": "Jogo didático em realidade virtual (Meta Quest 3 ou navegador): pegue moléculas inventadas com as mãos e encaixe-as em proteínas reais do PDB para entender como um remédio funciona.",
+  "defaultCaptions": {
+    "x": "Como um remédio funciona? Pegue moléculas com as mãos e teste o encaixe em proteínas reais. Joga no Meta Quest 3 ou no navegador!",
+    "facebook": "Encaixe Molecular VR: jogo didático para todas as idades. Teste moléculas inventadas em proteínas reais (tripsina, trombina, receptor β2) e veja quais encaixam, bloqueiam ou ativam.",
+    "reddit": "Fiz um jogo WebXR educativo para o Quest 3: superfícies de proteínas reais do PDB e moléculas fictícias para aprender encaixe, bloqueio e seletividade.",
+    "discord": "Encaixe Molecular VR: encaixe moléculas em proteínas reais e aprenda como os remédios funcionam!"
+  },
+  "assets": {
+    "og": "assets/share/og.png",
+    "favicon": "assets/share/favicon.png"
+  }
+}
