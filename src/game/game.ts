@@ -10,6 +10,7 @@ import { MINT, Panel, fitFont, font, roundRect, wrapText } from './panel'
 import { t } from '../i18n'
 import { EVENT_LEVELS, bestToday, fmtTime, saveBest, saveEventSetting, type EventPhases } from './event'
 import { recordError } from '../core/errlog'
+import { track } from '../core/analytics'
 import { FIT_TITLE, PERMS, bestFit, effectText, evaluate, rank, type FitResult, type Perm } from './rules'
 
 const V3 = THREE.Vector3
@@ -351,6 +352,7 @@ export class Game {
     const now = performance.now()
     this.result = null
     this.run = { phases: this.eventPhases, step: 0, phaseStart: now, times: [], lastAction: now }
+    track('event_run_start', { phases: this.eventPhases })
     this.clockSec = -1
     this.startLevel(EVENT_LEVELS[0])
   }
@@ -371,6 +373,7 @@ export class Game {
     const prev = bestToday(run.phases)
     const record = saveBest(run.phases, total)
     this.result = { phases: run.phases, times: [...run.times], total, record, best: record ? total : prev, at: performance.now() }
+    track('event_run_complete', { phases: run.phases, total_seconds: Math.round(total / 1000), day_record: record })
     this.showLobby()
     this.safe('som', () => this.audio.play('win'))
     for (let i = 0; i < 6; i++) {
@@ -1519,6 +1522,7 @@ export class Game {
       this.autoNext = CONFIG.play.autoNextSeconds
     } else if (idx >= 0 && idx < LEVELS.length - 1) this.autoNext = CONFIG.play.autoNextSeconds
     this.done.add(this.level.id)
+    track('level_complete', { level: this.level.id, event_mode: !!this.run, xr: this.renderer.xr.isPresenting })
     try { localStorage.setItem(SAVE_KEY, JSON.stringify([...this.done])) } catch { /* ignore */ }
     this.safe('som', () => this.audio.play('win'))
     this.safe('vibração', () => this.hapticAll(1, 200))

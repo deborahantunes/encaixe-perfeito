@@ -6,6 +6,7 @@ import { Game } from './game/game'
 import { loadProteins } from './game/models'
 import { localizeData } from './game/localize'
 import { LANGS, lang, setLang, t } from './i18n'
+import { initAnalytics, track } from './core/analytics'
 import { readEventSetting, saveEventSetting, type EventPhases } from './game/event'
 import { APP_VERSION, clearError, installGlobalErrorLog, lastError } from './core/errlog'
 /** Set by boot(): true when reloading would not interrupt anyone (not in VR, not mid-level). */
@@ -43,6 +44,7 @@ function setupOffline(el: HTMLElement): void {
 async function boot(): Promise<void> {
   installGlobalErrorLog()
   localizeData()
+  initAnalytics(lang)
   document.documentElement.lang = lang === 'pt' ? 'pt-BR' : lang
   const canvas = document.querySelector<HTMLCanvasElement>('#game')!
   const ui = document.getElementById('ui')!
@@ -165,6 +167,7 @@ async function boot(): Promise<void> {
         game.onHud({ holding: null, xr: false, mode: game.mode, event: game.eventPhases > 0 })
       })
       await renderer.xr.setSession(s)
+      track('play_start', { mode: mode === 'immersive-ar' ? 'mixed_reality' : 'vr', event_phases: game.eventPhases })
       start.classList.add('is-hidden')
       vr2.hidden = true
     } catch (err) {
@@ -174,6 +177,7 @@ async function boot(): Promise<void> {
   }
   const flat = () => {
     audio.unlock()
+    track('play_start', { mode: 'browser', event_phases: game.eventPhases })
     start.classList.add('is-hidden')
     vr2.hidden = !vrOk
     game.onHud({ holding: null, xr: false, mode: game.mode, event: game.eventPhases > 0 })

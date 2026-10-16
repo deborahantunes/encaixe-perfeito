@@ -39,6 +39,19 @@ Designed for science fairs and open-house events with many visitors:
   automatically. The result stays on screen for 90 s.
 - "Free mode" returns to the regular menu (tutorial, stages and free lab).
 
+## Analytics
+
+Visits are measured with Google Analytics 4 (property **EncaixePerfeito**, measurement ID `G-85PTRY5D21`).
+The tag is loaded only on the published site (`deborahantunes.github.io`), never in local development.
+Besides page views, the game sends a few custom events:
+
+| Event | Parameters |
+| --- | --- |
+| `play_start` | `mode` (`vr`, `mixed_reality`, `browser`), `event_phases` |
+| `level_complete` | `level`, `event_mode`, `xr` |
+| `event_run_start` | `phases` |
+| `event_run_complete` | `phases`, `total_seconds`, `day_record` |
+
 ## Development
 
 Requires Node.js 22 and pnpm.
@@ -60,6 +73,7 @@ Every push to `main` is built and published to GitHub Pages by `.github/workflow
 | --- | --- |
 | `src/game/data.ts` | Molecules, protein targets and stages |
 | `src/game/rules.ts` | Docking rules (size + chemistry scoring) |
+| `src/core/analytics.ts` | Google Analytics loader and custom events |
 | `src/game/event.ts` | Event mode settings, timing and best time of the day |
 | `src/game/game.ts` | Scene, menus, stages and animations |
 | `src/game/models.ts` | Protein surfaces and 3D molecules |
