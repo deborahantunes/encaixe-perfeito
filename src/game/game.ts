@@ -7,9 +7,8 @@ import { CHEM_COLOR, LEVELS, MOLECULES, TARGETS, type LevelDef, type MoleculeDef
 import { Fx } from './fx'
 import { armDir, buildMolecule, buildReceptor, labelTexture, type ReceptorModel } from './models'
 import { MINT, Panel, fitFont, font, roundRect, wrapText } from './panel'
-import { LANGS, lang, setLang, t, type Lang } from '../i18n'
+import { t } from '../i18n'
 import { EVENT_LEVELS, bestToday, fmtTime, saveBest, saveEventSetting, type EventPhases } from './event'
-import { localizeData } from './localize'
 import { recordError } from '../core/errlog'
 import { FIT_TITLE, PERMS, bestFit, effectText, evaluate, rank, type FitResult, type Perm } from './rules'
 
@@ -101,8 +100,6 @@ export class Game {
   private run: EventRun | null = null
   private result: EventResult | null = null
   private clockSec = -1
-  /** Called after the language is switched from inside the game (lobby buttons). */
-  onLang: () => void = () => {}
   private popups: { sprite: THREE.Sprite; life: number }[] = []
   private raycaster = new THREE.Raycaster()
   private level: LevelDef | null = null
@@ -157,7 +154,7 @@ export class Game {
     this.menu.mesh.position.set(0, 1.36, -0.72)
     this.menuGroup.add(this.menu.mesh)
     this.menu.setDraw((ctx, w, h) => this.drawMenu(ctx, w, h))
-    this.lobby = new Panel(0.9, 0.84, 1500)
+    this.lobby = new Panel(0.9, 0.76, 1500)
     this.lobby.mesh.position.set(0, 1.45, -0.74)
     this.lobby.mesh.visible = false
     this.menuGroup.add(this.lobby.mesh)
@@ -332,34 +329,22 @@ export class Game {
     const b = (id: string, x: number, y: number, w: number, h: number, label: string, onClick: () => void, color?: string, fontPx?: number) =>
       ({ id, x, y, w, h, label, onClick, color, fontPx })
     const n = this.eventPhases
-    this.lobby.buttons = LANGS.map((l, i) => b(`lang-${l.id}`, 60 + i * 270, 226, 250, 72, l.label, () => this.switchLang(l.id), l.id === lang ? MINT : '#8f86c9'))
-    this.lobby.buttons.push(b('start', 60, 740, W - 120, 150,
-      n === 1 ? t('COMEÇAR · 1 fase') : t('COMEÇAR · {n} fases', { n }), () => this.startRun(), MINT, 70))
+    this.lobby.buttons = [b('start', 60, 640, W - 120, 150,
+      n === 1 ? t('COMEÇAR · 1 fase') : t('COMEÇAR · {n} fases', { n }), () => this.startRun(), MINT, 70)]
     const opts: [EventPhases, string][] = [[1, t('1 fase')], [2, t('2 fases')], [3, t('3 fases')], [0, t('Modo livre')]]
-    opts.forEach(([v, label], i) => this.lobby.buttons.push(b(`ev${v}`, 250 + i * 216, 946, 200, 66, label,
+    opts.forEach(([v, label], i) => this.lobby.buttons.push(b(`ev${v}`, 250 + i * 216, 846, 200, 66, label,
       () => this.setEventPhases(v), v === n ? '#ffd23f' : '#8f86c9')))
-    this.lobby.buttons.push(b('sound', 60, 1036, 280, 66, this.audio.muted ? t('Som: desligado') : t('Som: ligado'), () => {
+    this.lobby.buttons.push(b('sound', 60, 936, 280, 66, this.audio.muted ? t('Som: desligado') : t('Som: ligado'), () => {
       this.audio.muted = !this.audio.muted
       this.showLobby()
     }, '#c9c4e8'))
     if (this.renderer.xr.isPresenting) {
-      this.lobby.buttons.push(b('recenter', 360, 1036, 320, 66, t('Recentralizar'), () => { this.needAlign = 1 }, '#c9c4e8'))
-      this.lobby.buttons.push(b('exit', W - 340, 1036, 280, 66, t('Sair da RV'), () => { void this.renderer.xr.getSession()?.end() }, '#ff9db5'))
+      this.lobby.buttons.push(b('recenter', 360, 936, 320, 66, t('Recentralizar'), () => { this.needAlign = 1 }, '#c9c4e8'))
+      this.lobby.buttons.push(b('exit', W - 340, 936, 280, 66, t('Sair da RV'), () => { void this.renderer.xr.getSession()?.end() }, '#ff9db5'))
     }
     this.lobby.invalidate()
     this.legend.invalidate()
     this.emitHud()
-  }
-
-  /** Switches the language live (no reload), so it can be changed inside the headset between visitors. */
-  private switchLang(next: Lang): void {
-    if (next === lang) return
-    setLang(next)
-    localizeData()
-    this.onLang()
-    this.legend.invalidate()
-    this.menu.invalidate()
-    this.showMenu()
   }
 
   private startRun(): void {
@@ -428,26 +413,19 @@ export class Game {
     ctx.fillStyle = MINT
     ctx.font = font(40, 'bold')
     ctx.fillText(t('Como uma molécula encontra seu alvo'), 200, 176)
-    if (this.brand.complete && this.brand.naturalWidth > 0) {
-      const lh = 84
-      const lw = lh * this.brand.naturalWidth / this.brand.naturalHeight
-      ctx.globalAlpha = 0.92
-      ctx.drawImage(this.brand, w - 60 - lw, 226, lw, lh)
-      ctx.globalAlpha = 1
-    }
     const n = this.eventPhases
     const r = this.result
     if (r) {
       ctx.fillStyle = MINT
       ctx.font = font(96, 'bold')
-      ctx.fillText(t('Parabéns!'), 60, 420)
+      ctx.fillText(t('Parabéns!'), 60, 320)
       ctx.fillStyle = '#ffffff'
       const done = r.phases === 1 ? t('Você completou 1 fase em {time}', { time: fmtTime(r.total) }) : t('Você completou {n} fases em {time}', { n: r.phases, time: fmtTime(r.total) })
       fitFont(ctx, done, w - 120, 50, 'bold')
-      ctx.fillText(done, 60, 490)
+      ctx.fillText(done, 60, 390)
       ctx.font = font(32)
       r.times.forEach((ms, i) => {
-        const y = 552 + i * 44
+        const y = 452 + i * 44
         ctx.fillStyle = '#d8d3f5'
         ctx.textAlign = 'left'
         ctx.fillText(LEVELS[EVENT_LEVELS[i]].title, 90, y)
@@ -458,14 +436,14 @@ export class Game {
       ctx.textAlign = 'left'
       ctx.fillStyle = '#ffd23f'
       ctx.font = font(36, 'bold')
-      ctx.fillText(r.record ? t('Novo recorde do dia!') : t('Melhor tempo de hoje: {time}', { time: fmtTime(r.best) }), 60, 552 + Math.max(3, r.times.length) * 44 + 12)
+      ctx.fillText(r.record ? t('Novo recorde do dia!') : t('Melhor tempo de hoje: {time}', { time: fmtTime(r.best) }), 60, 452 + r.times.length * 44 + 20)
     } else {
       ctx.fillStyle = MINT
       ctx.font = font(56, 'bold')
-      ctx.fillText(t('Pronto para o próximo jogador!'), 60, 392)
+      ctx.fillText(t('Pronto para o próximo jogador!'), 60, 292)
       ctx.fillStyle = '#d8d3f5'
       ctx.font = font(32)
-      let y = wrapText(ctx, t('Muitos remédios funcionam assim: uma molécula se encaixa numa proteína do corpo, como uma chave na fechadura. Pegue as moléculas, teste o encaixe e descubra o que acontece.'), 60, 452, w - 120, 42, 3)
+      let y = wrapText(ctx, t('Muitos remédios funcionam assim: uma molécula se encaixa numa proteína do corpo, como uma chave na fechadura. Pegue as moléculas, teste o encaixe e descubra o que acontece.'), 60, 352, w - 120, 42, 3)
       ctx.fillStyle = '#ffd23f'
       ctx.font = font(32, 'bold')
       y = wrapText(ctx, n === 1 ? t('Você vai jogar 1 fase. O relógio começa quando você apertar COMEÇAR.') : t('Você vai jogar {n} fases seguidas. O relógio começa quando você apertar COMEÇAR.', { n }), 60, y + 14, w - 120, 42, 2)
@@ -479,7 +457,7 @@ export class Game {
     ctx.textAlign = 'left'
     ctx.fillStyle = '#9a93c9'
     ctx.font = font(28, 'bold')
-    ctx.fillText(t('Equipe:'), 60, 990)
+    ctx.fillText(t('Equipe:'), 60, 890)
     ctx.font = font(24)
     ctx.fillText(t('Proteínas reais (banco PDB: tripsina 1BJU, trombina 1PPB, receptor β2 2RH1), com bolsos simplificados.'), 60, h - 84)
     ctx.fillText(t('Todas as moléculas são INVENTADAS: o jogo não mostra nem recomenda nenhum remédio de verdade.'), 60, h - 46)

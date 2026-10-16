@@ -33,7 +33,7 @@ Designed for science fairs and open-house events with many visitors:
 - Staff choose how many stages each visitor plays: **1 stage** (Stage 1), **2 stages** (Stages 1–2) or
   **3 stages** (full game). Choose on the start screen, on the "Staff" row of the in-headset panel, or with the
   URL: `?evento=1`, `?evento=2`, `?evento=3` (`?evento=0` turns it off). The choice is saved on the device.
-- The language (Português / English / Español) can be switched on the in-headset panel between visitors.
+- The language is chosen on the start screen (Português / English / Español); the whole game follows it.
 - The clock counts playing time only (not the 5 s pause between stages). "Restart" does not reset it.
 - "End game" returns to the next-player screen. After 3 minutes with no interaction, the game returns there
   automatically. The result stays on screen for 90 s.

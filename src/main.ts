@@ -149,16 +149,6 @@ async function boot(): Promise<void> {
   $('[data-act="vr"]').hidden = !vrOk
   $('[data-act="ar"]').hidden = !arOk
   const vr2 = $('[data-act="vr2"]')
-  // Language switched inside the game (event lobby): update the few HTML texts that stay on screen.
-  game.onLang = () => {
-    document.documentElement.lang = lang === 'pt' ? 'pt-BR' : lang
-    vr2.textContent = t('Entrar em RV')
-    ui.querySelectorAll<HTMLElement>('.hud .tool').forEach(el => {
-      el.textContent = el.dataset.act === 'flip' ? t('Virar') : `${t('Girar')} ${el.dataset.act === 'rotl' ? '⟵' : '⟶'}`
-    })
-    ui.querySelectorAll<HTMLElement>('[data-lang]').forEach(b => b.classList.toggle('on', b.dataset.lang === lang))
-    game.onHud({ holding: null, xr: renderer.xr.isPresenting, mode: game.mode, event: game.eventPhases > 0 })
-  }
 
   let session: XRSession | null = null
   const enter = async (mode: 'immersive-vr' | 'immersive-ar') => {
