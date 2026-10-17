@@ -181,6 +181,8 @@ export type LevelDef = {
   /** Selective levels: the protein that must be blocked; every other one must stay free. */
   blockTarget?: TargetId
   learned: string
+  /** Turn-only docking: flipping the molecule over is never needed (hands-only play with children). */
+  turnOnly?: boolean
 }
 
 export const LEVELS: LevelDef[] = [
@@ -195,14 +197,14 @@ export const LEVELS: LevelDef[] = [
     id: 1, kind: 'block', title: 'Fase 1 · A chave certa',
     intro: 'A tripsina é uma enzima de verdade: ela corta proteínas. Uma molécula pode entrar no bolso dela e travá-la, como uma chave errada presa na fechadura.',
     goal: 'Teste as moléculas no bolso da tripsina e descubra qual trava a enzima de vez.',
-    targets: ['tripsina_facil'], tray: ['gota', 'gigante', 'folha', 'grao', 'nuvem'], natural: 'alimento',
+    targets: ['tripsina_facil'], tray: ['gota', 'gigante', 'folha', 'grao', 'nuvem'], natural: 'alimento', turnOnly: true,
     learned: 'Para encaixar, a molécula precisa ter o TAMANHO e a QUÍMICA certos para o bolso: parte oleosa no buraco oleoso e parte que gosta de água no buraco que gosta de água. A Folha encaixou direitinho e travou a enzima!',
   },
   {
     id: 2, kind: 'block', title: 'Fase 2 · Ligar ou bloquear?',
     intro: 'O receptor β2 atravessa a membrana da célula. O bolso fica do lado de FORA. Quando o mensageiro natural encaixa e aperta o "interruptor" (anel tracejado), um recado passa para DENTRO da célula.',
     goal: 'Encontre a molécula que ocupa o receptor SEM apertar o interruptor, para o recado parar.',
-    targets: ['beta2'], tray: ['gota', 'raio2', 'cometa', 'pluma', 'escudo'], natural: 'mensageiro',
+    targets: ['beta2'], tray: ['gota', 'raio2', 'cometa', 'pluma', 'escudo'], natural: 'mensageiro', turnOnly: true,
     learned: 'Moléculas que encaixam e LIGAM o receptor se chamam agonistas. As que encaixam e só BLOQUEIAM se chamam antagonistas. As duas encaixam, mas fazem coisas opostas! A Escudo tem a ponta que gosta de água curtinha demais: não alcança o interruptor.',
   },
   {

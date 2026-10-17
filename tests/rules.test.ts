@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { LEVELS, MOLECULES, TARGETS, type MoleculeId, type TargetId } from '../src/game/data'
-import { bestFit, evaluate, PERMS } from '../src/game/rules'
+import { bestFit, evaluate, evaluateTurnOnly, PERMS, type Perm } from '../src/game/rules'
 import PROTEINS from '../src/game/proteins.json'
 
 const best = (m: MoleculeId, t: TargetId) => bestFit(MOLECULES[m], TARGETS[t])
@@ -52,6 +52,23 @@ describe('encaixe didático', () => {
     expect(best('raio2', 'beta2').fit).toBe('repel')
     const ok = lv.tray.filter(m => { const r = best(m, 'beta2'); return r.fit === 'strong' && !r.activates })
     expect(ok).toEqual(['escudo'])
+  })
+  it('fases 1 e 2: a molécula certa encaixa só GIRANDO (de qualquer lado, sem virar)', () => {
+    for (const [lv, m] of [[1, 'folha'], [2, 'escudo']] as const) {
+      const level = LEVELS[lv]
+      expect(level.turnOnly, level.title).toBe(true)
+      const t = TARGETS[level.targets[0]]
+      // Whatever face the hand shows (all 6 orientations), one of the 3 turns docks strongly.
+      for (const face of PERMS) {
+        const turns: Perm[] = [0, 1, 2].map(k => [face[k], face[(k + 1) % 3], face[(k + 2) % 3]] as Perm)
+        expect(turns.some(p => evaluateTurnOnly(MOLECULES[m], t, p).fit === 'strong'), `${m} ${face}`).toBe(true)
+      }
+    }
+  })
+  it('fase 2: girar só não basta para as moléculas erradas', () => {
+    for (const m of ['gota', 'raio2', 'cometa', 'pluma'] as const) {
+      for (const p of PERMS) expect(evaluateTurnOnly(MOLECULES[m], TARGETS.beta2, p).fit === 'strong' && !evaluateTurnOnly(MOLECULES[m], TARGETS.beta2, p).activates, m).toBe(false)
+    }
   })
   it('fase 2: mensageiro e Raio ativam o β2, Escudo bloqueia', () => {
     expect(best('mensageiro', 'beta2')).toMatchObject({ fit: 'strong', activates: true })

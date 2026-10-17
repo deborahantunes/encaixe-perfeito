@@ -11,7 +11,7 @@ import { t } from '../i18n'
 import { EVENT_LEVELS, bestToday, saveBest, saveEventSetting, type EventPhases } from './event'
 import { recordError } from '../core/errlog'
 import { track } from '../core/analytics'
-import { FIT_TITLE, PERMS, bestFit, effectText, evaluate, rank, type FitResult, type Perm } from './rules'
+import { FIT_TITLE, PERMS, bestFit, effectText, evaluate, evaluateTurnOnly, rank, type FitResult, type Perm } from './rules'
 
 const V3 = THREE.Vector3
 const Q = THREE.Quaternion
@@ -1208,7 +1208,8 @@ export class Game {
     const level = this.level!
     const best = bestFit(mol.def, rec.def)
     let perm = this.permFromOrientation(mol, rec)
-    let r = evaluate(mol.def, rec.def, perm)
+    let r = level.turnOnly ? evaluateTurnOnly(mol.def, rec.def, perm) : evaluate(mol.def, rec.def, perm)
+    perm = r.perm
     let hint = ''
     const auto = level.kind === 'selective'
     if (auto) { r = best; perm = best.perm }
@@ -1219,7 +1220,7 @@ export class Game {
         perm = best.perm
         hint = t('Ajudinha: girei a molécula para a melhor posição.')
         mol.fails = 0
-      } else hint = this.simpleLegend()
+      } else hint = this.simpleLegend() || level.turnOnly
         ? t('Dica: gire a molécula até as cores combinarem!')
         : t('Dica: gire ou vire a molécula. Em outra posição ela pode encaixar melhor!')
     }

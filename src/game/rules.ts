@@ -101,6 +101,17 @@ function cavityAdj(size: number): string {
   return size === 1 ? t('pequeno') : size === 2 ? t('médio') : t('grande')
 }
 
+/**
+ * Turn-only docking (for young players): the side of the molecule that faces the player does not matter.
+ * `perm` is what the player's turn produced; its mirror image keeps the arm in the first (anchor) cavity and swaps
+ * the other two, i.e. the same turn seen from the other face. The better of the two is used.
+ */
+export function evaluateTurnOnly(mol: MoleculeDef, target: TargetDef, perm: Perm): FitResult {
+  const a = evaluate(mol, target, perm)
+  const b = evaluate(mol, target, [perm[0], perm[2], perm[1]])
+  return rank(b.fit) > rank(a.fit) || (rank(b.fit) === rank(a.fit) && b.affinity > a.affinity) ? b : a
+}
+
 const RANK: Record<FitClass, number> = { clash: 0, repel: 0, slip: 1, weak: 2, strong: 3 }
 
 export function rank(fit: FitClass): number {

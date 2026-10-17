@@ -48,6 +48,10 @@ In Stage 2 the β2 receptor is tilted towards the player (40°) so the colours a
 see, and the Stage 2 "Bolt" (Raio) has a **red (−) tip**, so it is clearly different from Shield (Escudo), the
 right answer.
 
+Stages 1 and 2 use **turn-only docking**: which face of the molecule the player shows does not matter. Turning it
+until the tip with the dot (or the right colour) points at the matching hole is enough; the molecule settles on
+its correct face by itself, so it never needs to be flipped over by hand.
+
 ## Analytics
 
 Visits are measured with Google Analytics 4 (property **EncaixePerfeito**, measurement ID `G-85PTRY5D21`).
