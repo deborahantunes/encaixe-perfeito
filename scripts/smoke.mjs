@@ -26,13 +26,13 @@ const toScreen = expr => page.evaluate(expr => {
 let fit = null
 const keys = [[], ['e'], ['e', 'e'], ['f'], ['f', 'e'], ['f', 'e', 'e']]
 for (const seq of keys) {
-  await page.waitForFunction(() => window.__game.game.mols.find(m => m.def.id === 'cometa').state === 'tray')
-  const mol = await toScreen("g.mols.find(m => m.def.id === 'cometa').obj.position")
+  await page.waitForFunction(() => window.__game.game.mols.find(m => m.def.id === 'folha').state === 'tray')
+  const mol = await toScreen("g.mols.find(m => m.def.id === 'folha').obj.position")
   await page.mouse.move(mol.x, mol.y)
   await page.waitForTimeout(150)
   await page.mouse.down(); await page.mouse.up()
   await page.waitForFunction(() => window.__game.game.pointers.mouse.held, null, { timeout: 4000 }).catch(() => {})
-  if (await page.evaluate(() => window.__game.game.pointers.mouse.held?.def?.id) !== 'cometa') fail('mouse did not pick the molecule')
+  if (await page.evaluate(() => window.__game.game.pointers.mouse.held?.def?.id) !== 'folha') fail('mouse did not pick the molecule')
   for (const k of seq) { await page.keyboard.press(k); await page.waitForTimeout(120) }
   await page.waitForTimeout(900)
   const pocket = await toScreen('g.receptors[0].center')
@@ -52,7 +52,7 @@ await page.waitForFunction(() => window.__game.game.tutStep === 1, null, { timeo
 await page.evaluate(() => { const g = window.__game.game; g.debugDock('cometa') })
 await page.waitForFunction(() => window.__game.game.isWon, null, { timeout: 90000 }).catch(() => fail('tutorial not won'))
 // Level 1 & 2: a blocker must turn away two natural molecules.
-for (const [lv, id] of [[1, 'cometa'], [2, 'escudo']]) {
+for (const [lv, id] of [[1, 'folha'], [2, 'escudo']]) {
   await page.evaluate(([lv, id]) => { const g = window.__game.game; g.startLevel(lv); g.debugDock(id) }, [lv, id])
   await page.waitForFunction(() => window.__game.game.isWon, null, { timeout: 90000 }).catch(() => fail(`level ${lv} not won`))
 }

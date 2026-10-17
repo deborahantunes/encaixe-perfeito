@@ -24,20 +24,25 @@ After one online visit the game is stored on the device and also works **offline
 
 ## Event mode (visitor queue)
 
-Designed for science fairs and open-house events with many visitors:
+Designed for science fairs and open-house events with many visitors, including young children, using
+**hand tracking only** (no controllers needed after the staff presses START once):
 
-- The headset waits on a **"Ready for the next player!"** panel with a big **START** button.
 - Each visitor plays the stages in a row, with no menu. The next stage starts automatically after each win.
-- At the end, the panel shows **Congratulations!**, the total time, the time per stage and the best time of the
-  day. Then it is immediately ready for the next person.
+- At the end the panel shows only **Congratulations!** (no clock) and, after a few seconds, the game restarts
+  by itself for the next person. If nobody interacts for 3 minutes, it also restarts from the first stage.
+- There is no "end game" button during play, so a child cannot leave the game by accident.
 - Staff choose how many stages each visitor plays: **1 stage** (Stage 1), **2 stages** (Stages 1–2) or
-  **3 stages** (full game). Choose on the start screen, on the "Staff" row of the in-headset panel, or with the
-  URL: `?evento=1`, `?evento=2`, `?evento=3` (`?evento=0` turns it off). The choice is saved on the device.
+  **3 stages** (full game). Choose on the start screen, on the "Staff" row of the in-headset panel (shown on the
+  start panel and during the congratulations screen), or with the URL: `?evento=1`, `?evento=2`, `?evento=3`
+  (`?evento=0` turns it off). The choice is saved on the device.
 - The language is chosen on the start screen (Português / English / Español); the whole game follows it.
-- The clock counts playing time only (not the 5 s pause between stages). "Restart" does not reset it.
-- "End game" returns to the next-player screen. After 3 minutes with no interaction, the game returns there
-  automatically. The result stays on screen for 90 s.
-- "Free mode" returns to the regular menu (tutorial, stages and free lab).
+
+### Stage 1 is designed for young children
+
+Stage 1 uses the real trypsin surface (PDB 1BJU) with a simplified pocket that has **no charges**: two
+medium water-loving wells and one large oily well. All tray molecules are uncharged, too, so the only ideas are
+size and oil/water. The correct molecule (Leaf) has two identical water-loving arms, so it always docks by
+**turning** it; it never needs to be flipped over. Stages 2 and 3 keep the +/− charge rules.
 
 ## Analytics
 

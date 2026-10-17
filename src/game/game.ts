@@ -8,7 +8,7 @@ import { Fx } from './fx'
 import { armDir, buildMolecule, buildReceptor, labelTexture, type ReceptorModel } from './models'
 import { MINT, Panel, fitFont, font, roundRect, wrapText } from './panel'
 import { t } from '../i18n'
-import { EVENT_LEVELS, bestToday, fmtTime, saveBest, saveEventSetting, type EventPhases } from './event'
+import { EVENT_LEVELS, bestToday, saveBest, saveEventSetting, type EventPhases } from './event'
 import { recordError } from '../core/errlog'
 import { track } from '../core/analytics'
 import { FIT_TITLE, PERMS, bestFit, effectText, evaluate, rank, type FitResult, type Perm } from './rules'
@@ -373,6 +373,7 @@ export class Game {
     const prev = bestToday(run.phases)
     const record = saveBest(run.phases, total)
     this.result = { phases: run.phases, times: [...run.times], total, record, best: record ? total : prev, at: performance.now() }
+    this.clockSec = -1
     track('event_run_complete', { phases: run.phases, total_seconds: Math.round(total / 1000), day_record: record })
     this.showLobby()
     this.safe('som', () => this.audio.play('win'))
@@ -384,25 +385,18 @@ export class Game {
     }
   }
 
-  /** Total play time of the current visitor (pauses between levels). */
-  private runElapsed(): number {
-    const run = this.run
-    if (!run) return 0
-    const done = run.times.slice(0, run.step).reduce((a, x) => a + x, 0)
-    const cur = run.times[run.step] ?? (performance.now() - run.phaseStart)
-    return done + cur
-  }
-
   private tickEvent(): void {
     const now = performance.now()
     if (this.run && this.mode === 'level') {
-      if (now - this.run.lastAction > CONFIG.play.eventIdleSeconds * 1000 && !this.won) { this.showLobby(); return }
-      const sec = Math.floor(this.runElapsed() / 1000)
-      if (sec !== this.clockSec) { this.clockSec = sec; this.mission.invalidate() }
+      // Visitor left the headset mid-game: start over from the first level, ready for the next person.
+      if (now - this.run.lastAction > CONFIG.play.eventIdleSeconds * 1000 && !this.won) { this.startRun(); return }
     }
-    if (this.result && this.mode === 'menu' && now - this.result.at > CONFIG.play.eventResultSeconds * 1000) {
-      this.result = null
-      this.showLobby()
+    if (this.result && this.mode === 'menu') {
+      const left = CONFIG.play.eventResultSeconds - (now - this.result.at) / 1000
+      // Hands-only flow: after "Parabéns!" the next game starts by itself (no button to press).
+      if (left <= 0) { this.startRun(); return }
+      const sec = Math.ceil(left)
+      if (sec !== this.clockSec) { this.clockSec = sec; this.lobby.invalidate() }
     }
   }
 
@@ -419,27 +413,18 @@ export class Game {
     const n = this.eventPhases
     const r = this.result
     if (r) {
+      ctx.textAlign = 'center'
       ctx.fillStyle = MINT
-      ctx.font = font(96, 'bold')
-      ctx.fillText(t('Parabéns!'), 60, 320)
+      ctx.font = font(150, 'bold')
+      ctx.fillText(t('Parabéns!'), w / 2, 400)
       ctx.fillStyle = '#ffffff'
-      const done = r.phases === 1 ? t('Você completou 1 fase em {time}', { time: fmtTime(r.total) }) : t('Você completou {n} fases em {time}', { n: r.phases, time: fmtTime(r.total) })
-      fitFont(ctx, done, w - 120, 50, 'bold')
-      ctx.fillText(done, 60, 390)
-      ctx.font = font(32)
-      r.times.forEach((ms, i) => {
-        const y = 452 + i * 44
-        ctx.fillStyle = '#d8d3f5'
-        ctx.textAlign = 'left'
-        ctx.fillText(LEVELS[EVENT_LEVELS[i]].title, 90, y)
-        ctx.textAlign = 'right'
-        ctx.fillStyle = '#ffffff'
-        ctx.fillText(fmtTime(ms), w - 90, y)
-      })
-      ctx.textAlign = 'left'
+      ctx.font = font(48, 'bold')
+      ctx.fillText(r.phases === 1 ? t('Você completou o desafio!') : t('Você completou as {n} fases!', { n: r.phases }), w / 2, 480)
       ctx.fillStyle = '#ffd23f'
       ctx.font = font(36, 'bold')
-      ctx.fillText(r.record ? t('Novo recorde do dia!') : t('Melhor tempo de hoje: {time}', { time: fmtTime(r.best) }), 60, 452 + r.times.length * 44 + 20)
+      const left = Math.max(1, Math.ceil(CONFIG.play.eventResultSeconds - (performance.now() - r.at) / 1000))
+      ctx.fillText(t('Próximo jogador em {n} s...', { n: left }), w / 2, 570)
+      ctx.textAlign = 'left'
     } else {
       ctx.fillStyle = MINT
       ctx.font = font(56, 'bold')
@@ -449,13 +434,7 @@ export class Game {
       let y = wrapText(ctx, t('Muitos remédios funcionam assim: uma molécula se encaixa numa proteína do corpo, como uma chave na fechadura. Pegue as moléculas, teste o encaixe e descubra o que acontece.'), 60, 352, w - 120, 42, 3)
       ctx.fillStyle = '#ffd23f'
       ctx.font = font(32, 'bold')
-      y = wrapText(ctx, n === 1 ? t('Você vai jogar 1 fase. O relógio começa quando você apertar COMEÇAR.') : t('Você vai jogar {n} fases seguidas. O relógio começa quando você apertar COMEÇAR.', { n }), 60, y + 14, w - 120, 42, 2)
-      const best = bestToday(n)
-      if (best) {
-        ctx.fillStyle = '#c9c4e8'
-        ctx.font = font(30)
-        ctx.fillText(t('Melhor tempo de hoje: {time}', { time: fmtTime(best) }), 60, y + 20)
-      }
+      wrapText(ctx, n === 1 ? t('Você vai jogar 1 fase.') : t('Você vai jogar {n} fases seguidas.', { n }), 60, y + 14, w - 120, 42, 2)
     }
     ctx.textAlign = 'left'
     ctx.fillStyle = '#9a93c9'
@@ -599,12 +578,13 @@ export class Game {
     const btn = (id: string, x: number, y: number, w: number, h: number, label: string, onClick: () => void, color?: string) =>
       ({ id, x, y, w, h, label, onClick, color })
     const idx = LEVELS.indexOf(level)
-    this.mission.buttons = [
-      this.run
-        ? btn('menu', 40, H - 120, 220, 84, t('Encerrar'), () => this.showLobby(), '#ff9db5')
-        : btn('menu', 40, H - 120, 220, 84, t('Menu'), () => this.showMenu(), '#c9c4e8'),
-      btn('restart', 280, H - 120, 260, 84, t('Recomeçar'), () => this.startLevel(idx), '#c9c4e8'),
-    ]
+    // Event mode is hands-only and self-running: no "end" button a child could bump by accident.
+    this.mission.buttons = this.run
+      ? [btn('restart', 40, H - 120, 260, 84, t('Recomeçar'), () => this.startLevel(idx), '#c9c4e8')]
+      : [
+        btn('menu', 40, H - 120, 220, 84, t('Menu'), () => this.showMenu(), '#c9c4e8'),
+        btn('restart', 280, H - 120, 260, 84, t('Recomeçar'), () => this.startLevel(idx), '#c9c4e8'),
+      ]
     if ((level.kind === 'block' || level.kind === 'tutorial') && !this.won && level.natural) {
       this.mission.buttons.push(btn('demo', 40, H - 216, W - 80, 80, t('Ver o que faz a molécula natural'), () => { this.natTimer = 0.05 }, '#7fc8ff'))
     }
@@ -658,15 +638,22 @@ export class Game {
     }
   }
 
+  /** Oil/water-only legend: levels with no charged cavity (Stage 1), or the lobby of a 1-stage event. */
+  private simpleLegend(): boolean {
+    const isCharge = (c: string) => c === 'pos' || c === 'neg'
+    if (this.level) return (this.level.kind === 'lab' ? [this.labTarget] : this.level.targets).every(id => !TARGETS[id].cavities.some(c => isCharge(c.chem)))
+    return this.eventPhases === 1
+  }
+
   private drawLegend(ctx: CanvasRenderingContext2D, w: number, _h: number): void {
     ctx.textAlign = 'left'
     ctx.textBaseline = 'alphabetic'
     ctx.fillStyle = MINT
     ctx.font = font(46, 'bold')
     ctx.fillText(t('Como encaixar'), 40, 76)
+    const simple = this.simpleLegend()
     const rows: [number, string, string][] = [
-      [CHEM_COLOR.pos, '+', t('Carga positiva')],
-      [CHEM_COLOR.neg, '−', t('Carga negativa')],
+      ...(simple ? [] : [[CHEM_COLOR.pos, '+', t('Carga positiva')], [CHEM_COLOR.neg, '−', t('Carga negativa')]] as [number, string, string][]),
       [CHEM_COLOR.oil, '~', t('Oleosa (foge da água)')],
       [CHEM_COLOR.polar, '💧', t('Gosta de água')],
     ]
@@ -690,7 +677,11 @@ export class Game {
     y += 6
     ctx.fillStyle = '#ffffff'
     ctx.font = font(29)
-    const rules = [
+    const rules = simple ? [
+      t('• Óleo com óleo, água com água'),
+      t('• A bolinha precisa CABER no buraco'),
+      t('• Gire a molécula até as cores combinarem'),
+    ] : [
       t('• Opostos se atraem: + com −'),
       t('• Iguais se empurram: + com +'),
       t('• Óleo com óleo, água com água'),
@@ -718,15 +709,8 @@ export class Game {
     ctx.textAlign = 'left'
     ctx.textBaseline = 'alphabetic'
     ctx.fillStyle = MINT
-    fitFont(ctx, level.title, w - 80 - (this.run ? 190 : 0), 46, 'bold')
+    fitFont(ctx, level.title, w - 80, 46, 'bold')
     ctx.fillText(level.title, 40, 72)
-    if (this.run) {
-      ctx.textAlign = 'right'
-      ctx.fillStyle = '#ffd23f'
-      ctx.font = font(48, 'bold')
-      ctx.fillText(fmtTime(this.runElapsed()), w - 40, 74)
-      ctx.textAlign = 'left'
-    }
     ctx.fillStyle = '#ffffff'
     ctx.font = font(29)
     let y = 118
@@ -758,7 +742,7 @@ export class Game {
         ctx.fillStyle = '#ffd23f'
         ctx.font = font(34, 'bold')
         const last = !!this.run && this.run.step >= this.run.phases - 1
-        const msg = last ? t('Resultado em {n} s...', { n: Math.ceil(this.autoNext) }) : t('Próxima fase em {n} s...', { n: Math.ceil(this.autoNext) })
+        const msg = last ? t('Parabéns em {n} s...', { n: Math.ceil(this.autoNext) }) : t('Próxima fase em {n} s...', { n: Math.ceil(this.autoNext) })
         ctx.fillText(msg, 40, Math.min(bottom - 10, yy + 50))
       }
       return
@@ -1235,7 +1219,9 @@ export class Game {
         perm = best.perm
         hint = t('Ajudinha: girei a molécula para a melhor posição.')
         mol.fails = 0
-      } else hint = t('Dica: gire ou vire a molécula. Em outra posição ela pode encaixar melhor!')
+      } else hint = this.simpleLegend()
+        ? t('Dica: gire a molécula até as cores combinarem!')
+        : t('Dica: gire ou vire a molécula. Em outra posição ela pode encaixar melhor!')
     }
     if (level.kind === 'lab') this.notebook.set(mol.def.id, bestFit(mol.def, rec.def))
     if (level.kind === 'tutorial' && this.tutStep <= 2 && r.fit !== 'strong') this.setTutStep(3)

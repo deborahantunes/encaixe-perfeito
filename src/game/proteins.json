@@ -30,6 +30,37 @@
     ],
     "ligandDepth": -0.0371
   },
+  "tripsina_facil": {
+    "id": "tripsina_facil",
+    "pdb": "1BJU",
+    "scale": 0.009,
+    "faces": 60000,
+    "bboxMin": [
+      -0.2782,
+      -0.2482,
+      -0.2702
+    ],
+    "bboxMax": [
+      0.1763,
+      0.2015,
+      0.0877
+    ],
+    "cavities": [
+      {
+        "size": 2,
+        "chem": "polar"
+      },
+      {
+        "size": 3,
+        "chem": "oil"
+      },
+      {
+        "size": 2,
+        "chem": "polar"
+      }
+    ],
+    "ligandDepth": -0.0371
+  },
   "trombina": {
     "id": "trombina",
     "pdb": "1PPB",

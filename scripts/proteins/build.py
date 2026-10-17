@@ -34,6 +34,11 @@ TARGETS = [
     dict(id='tripsina', pdb='1BJU', chains='A', ligand='GP6', anchor=('A', 189, 'CG'),
          tint=(0.70, 0.60, 1.0), faces=60000,
          cavities=[(2, 'neg'), (3, 'oil'), (1, 'polar')]),
+    # Stage 1 for young players: same real trypsin surface, but with uncharged wells (water, oil, water) and
+    # charged residues drawn in neutral tones, so the first level is only about shape + oil/water.
+    dict(id='tripsina_facil', pdb='1BJU', chains='A', ligand='GP6', anchor=('A', 189, 'CG'),
+         tint=(0.70, 0.60, 1.0), faces=60000, neutral=True,
+         cavities=[(2, 'polar'), (3, 'oil'), (2, 'polar')]),
     dict(id='trombina', pdb='1PPB', chains='HL', ligand='0G6', anchor=('H', 189, 'CG'),
          tint=(1.0, 0.68, 0.55), faces=60000,
          cavities=[(2, 'neg'), (3, 'oil'), (2, 'oil')]),
@@ -166,7 +171,8 @@ def build(t):
     base = np.array(t['tint'])
     props = []
     for (_, res, name, el) in atoms:
-        if (res, name) in NEG: props.append(((0.95, 0.32, 0.36), 0.9))
+        if t.get('neutral') and ((res, name) in NEG or (res, name) in POS): props.append(((0.62, 0.90, 0.84), 0.35))
+        elif (res, name) in NEG: props.append(((0.95, 0.32, 0.36), 0.9))
         elif (res, name) in POS: props.append(((0.32, 0.52, 1.0), 0.9))
         elif el == 'C' and res in HYDRO and name not in BACKBONE: props.append(((1.0, 0.86, 0.45), 0.55))
         elif el in ('N', 'O'): props.append(((0.62, 0.90, 0.84), 0.35))
@@ -236,6 +242,13 @@ def build(t):
 
 
 if __name__ == '__main__':
-    metas = {t['id']: build(t) for t in TARGETS}
+    # Optional: python3 build.py tripsina_facil  -> rebuild only these ids, keep the others in the JSON.
+    import sys
+    only = set(sys.argv[1:])
+    metas = json.load(open(OUT_JSON)) if only and os.path.exists(OUT_JSON) else {}
+    for t in TARGETS:
+        if not only or t['id'] in only:
+            metas[t['id']] = build(t)
+    metas = {t['id']: metas[t['id']] for t in TARGETS if t['id'] in metas}
     json.dump(metas, open(OUT_JSON, 'w'), indent=2)
     print('wrote', OUT_JSON)

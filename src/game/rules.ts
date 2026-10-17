@@ -75,8 +75,8 @@ export function evaluate(mol: MoleculeDef, target: TargetDef, perm: Perm): FitRe
     return { ...base, affinity: 0, fit: 'repel', activates: false,
       reason: t('Opa! Cargas iguais se empurram ({sign}). A molécula foi repelida.', { sign }) }
   }
-  const anchor = slots[target.anchor]
-  if (anchor.chem !== 'attract') {
+  const anchor = target.anchor >= 0 ? slots[target.anchor] : null
+  if (anchor && anchor.chem !== 'attract') {
     const want = target.cavities[target.anchor].chem === 'pos' ? t('negativa (−)') : t('positiva (+)')
     return { ...base, fit: 'slip', activates: false,
       reason: t('Não grudou. A âncora do bolso precisa de uma carga {want} e não encontrou.', { want }) }

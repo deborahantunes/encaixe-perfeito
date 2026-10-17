@@ -15,8 +15,9 @@ export type Cavity = { size: 1 | 2 | 3; chem: Chem }
 export type MoleculeId =
   | 'substrato' | 'mensageiro'
   | 'cometa' | 'trevo' | 'escudo' | 'raio' | 'gota' | 'gigante' | 'faisca' | 'pluma'
+  | 'alimento' | 'folha' | 'grao' | 'nuvem'
 
-export type TargetId = 'tripsina' | 'trombina' | 'beta2'
+export type TargetId = 'tripsina' | 'tripsina_facil' | 'trombina' | 'beta2'
 
 export type MoleculeDef = {
   id: MoleculeId
@@ -41,7 +42,7 @@ export type TargetDef = {
   /** What the protein does in the body. */
   role: string
   cavities: [Cavity, Cavity, Cavity]
-  /** Charged "anchor" cavity: needs the opposite charge, otherwise the molecule slips out. */
+  /** Charged "anchor" cavity: needs the opposite charge, otherwise the molecule slips out (-1 = no anchor). */
   anchor: number
   /** Receptor on/off switch: touching it exactly (size + chemistry) activates the protein. -1 for enzymes. */
   switchCavity: number
@@ -103,6 +104,27 @@ export const MOLECULES: Record<MoleculeId, MoleculeDef> = {
     about: 'Molécula inventada com uma ponta NEGATIVA (−).',
     groups: [g(2, 'neg'), g(2, 'oil'), g(1, 'polar')],
   },
+  // Stage 1 (young players): no charges at all, only oil / water and sizes.
+  alimento: {
+    id: 'alimento', name: 'Proteína do alimento', natural: true, substrate: true, tint: 0xffd6a5,
+    about: 'Pedaço natural de proteína que a enzima corta. É o "trabalho" normal da enzima.',
+    groups: [g(2, 'polar'), g(2, 'oil'), g(1, 'polar')],
+  },
+  folha: {
+    id: 'folha', name: 'Molécula Folha', tint: 0xc6f5a8,
+    about: 'Molécula inventada com uma parte oleosa grande entre duas partes médias que gostam de água.',
+    groups: [g(2, 'polar'), g(3, 'oil'), g(2, 'polar')],
+  },
+  grao: {
+    id: 'grao', name: 'Molécula Grão', tint: 0xffe9b8,
+    about: 'Molécula inventada bem pequena e oleosa.',
+    groups: [g(1, 'oil'), g(1, 'oil'), NONE],
+  },
+  nuvem: {
+    id: 'nuvem', name: 'Molécula Nuvem', tint: 0xdfe6ff,
+    about: 'Molécula inventada que é toda oleosa: não tem nenhuma parte que gosta de água.',
+    groups: [g(2, 'oil'), g(3, 'oil'), g(2, 'oil')],
+  },
   pluma: {
     id: 'pluma', name: 'Molécula Pluma', tint: 0xe6c8ff,
     about: 'Molécula inventada bem pequena e leve.',
@@ -116,6 +138,12 @@ export const TARGETS: Record<TargetId, TargetDef> = {
     role: 'Enzima da digestão: corta as proteínas dos alimentos.',
     cavities: [{ size: 2, chem: 'neg' }, { size: 3, chem: 'oil' }, { size: 1, chem: 'polar' }],
     anchor: 0, switchCavity: -1, effect: 'Cortando proteínas', word: 'Cortou!',
+  },
+  tripsina_facil: {
+    id: 'tripsina_facil', name: 'Tripsina', short: 'tripsina', pdb: '1BJU', color: 0xb9a8ff,
+    role: 'Enzima da digestão: corta as proteínas dos alimentos.',
+    cavities: [{ size: 2, chem: 'polar' }, { size: 3, chem: 'oil' }, { size: 2, chem: 'polar' }],
+    anchor: -1, switchCavity: -1, effect: 'Cortando proteínas', word: 'Cortou!',
   },
   trombina: {
     id: 'trombina', name: 'Trombina', short: 'trombina', pdb: '1PPB', color: 0xffb08f,
@@ -160,8 +188,8 @@ export const LEVELS: LevelDef[] = [
     id: 1, kind: 'block', title: 'Fase 1 · A chave certa',
     intro: 'A tripsina é uma enzima de verdade: ela corta proteínas. Uma molécula pode entrar no bolso dela e travá-la, como uma chave errada presa na fechadura.',
     goal: 'Teste as moléculas no bolso da tripsina e descubra qual trava a enzima de vez.',
-    targets: ['tripsina'], tray: ['gota', 'gigante', 'faisca', 'pluma', 'cometa'], natural: 'substrato',
-    learned: 'Para encaixar, a molécula precisa ter o FORMATO e a QUÍMICA certos para o bolso. No fundo do bolso da tripsina existe uma parte negativa de verdade (o aminoácido Asp189): por isso só moléculas com ponta positiva grudam.',
+    targets: ['tripsina_facil'], tray: ['gota', 'gigante', 'folha', 'grao', 'nuvem'], natural: 'alimento',
+    learned: 'Para encaixar, a molécula precisa ter o TAMANHO e a QUÍMICA certos para o bolso: parte oleosa no buraco oleoso e parte que gosta de água no buraco que gosta de água. A Folha encaixou direitinho e travou a enzima!',
   },
   {
     id: 2, kind: 'block', title: 'Fase 2 · Ligar ou bloquear?',

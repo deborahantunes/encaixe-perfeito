@@ -9,8 +9,8 @@ export const DEFAULT_CONFIG: { readonly play: Readonly<PlayConfig> } = Object.fr
     autoNextSeconds: 5,
     /** Event mode: a run with no grab for this long goes back to the lobby (visitor left the headset). */
     eventIdleSeconds: 180,
-    /** Event mode: how long the "Parabéns" result stays on the lobby before it is cleared. */
-    eventResultSeconds: 90,
+    /** Event mode: how long "Parabéns!" stays on screen before the game restarts by itself for the next person. */
+    eventResultSeconds: 7,
     /** Seconds between natural molecules arriving at the protein. */
     naturalInterval: 4.5,
     /** Molecule flight speed multiplier. */

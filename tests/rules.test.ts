@@ -13,16 +13,37 @@ describe('encaixe didático', () => {
     }
     for (const l of LEVELS) expect(banned.test(l.intro + l.goal + l.learned), l.title).toBe(false)
   })
-  it('fase 1: só a Cometa trava a tripsina', () => {
+  it('tutorial e laboratório: só a Cometa trava a tripsina (com carga)', () => {
     expect(best('cometa', 'tripsina')).toMatchObject({ fit: 'strong', activates: false })
     expect(best('gota', 'tripsina').fit).toBe('slip')
     expect(best('gigante', 'tripsina').fit).toBe('clash')
     expect(best('pluma', 'tripsina').fit).toBe('weak')
     expect(best('substrato', 'tripsina')).toMatchObject({ fit: 'strong', activates: true })
   })
-  it('fase 1: a Faísca (−) é repelida pelo Asp189 (−) quando vai na âncora', () => {
+  it('tripsina com carga: a Faísca (−) é repelida pelo Asp189 (−) quando vai na âncora', () => {
     const r = evaluate(MOLECULES.faisca, TARGETS.tripsina, [0, 1, 2])
     expect(r.fit).toBe('repel')
+  })
+  it('fase 1 (crianças): bolso e bandeja sem nenhuma carga, só óleo e água', () => {
+    const lv = LEVELS[1]
+    expect(lv.targets).toEqual(['tripsina_facil'])
+    const charged = (c: string) => c === 'pos' || c === 'neg'
+    expect(TARGETS.tripsina_facil.cavities.some(c => charged(c.chem))).toBe(false)
+    for (const id of [...lv.tray, lv.natural!]) expect(MOLECULES[id].groups.some(gr => charged(gr.chem)), id).toBe(false)
+  })
+  it('fase 1 (crianças): só a Folha trava, e as outras dão resultados diferentes', () => {
+    expect(best('folha', 'tripsina_facil')).toMatchObject({ fit: 'strong', activates: false })
+    expect(best('gigante', 'tripsina_facil').fit).toBe('clash')
+    expect(best('grao', 'tripsina_facil').fit).toBe('slip')
+    expect(best('gota', 'tripsina_facil').fit).toBe('weak')
+    expect(best('nuvem', 'tripsina_facil').fit).toBe('weak')
+    expect(best('alimento', 'tripsina_facil')).toMatchObject({ fit: 'strong', activates: true })
+  })
+  it('fase 1 (crianças): a Folha encaixa só GIRANDO, de qualquer lado (nunca precisa virar)', () => {
+    const strong = PERMS.filter(p => evaluate(MOLECULES.folha, TARGETS.tripsina_facil, p).fit === 'strong')
+    // One rotation (cyclic perm) and one flipped perm both work: whichever face the hand shows, a turn is enough.
+    expect(strong.some(p => PERMS.slice(0, 3).includes(p))).toBe(true)
+    expect(strong.some(p => PERMS.slice(3).includes(p))).toBe(true)
   })
   it('fase 2: mensageiro e Raio ativam o β2, Escudo bloqueia', () => {
     expect(best('mensageiro', 'beta2')).toMatchObject({ fit: 'strong', activates: true })
@@ -36,7 +57,7 @@ describe('encaixe didático', () => {
     expect(best('cometa', 'tripsina').fit).toBe('strong')
   })
   it('a resposta certa combina cor com cor (sem parte na química errada)', () => {
-    for (const [m, t] of [['cometa', 'tripsina'], ['escudo', 'beta2'], ['trevo', 'trombina']] as const) {
+    for (const [m, t] of [['cometa', 'tripsina'], ['folha', 'tripsina_facil'], ['escudo', 'beta2'], ['trevo', 'trombina']] as const) {
       const r = best(m, t)
       expect(r.slots.every(sl => sl.chem !== 'mismatch'), `${m}:${t}`).toBe(true)
     }
@@ -45,7 +66,7 @@ describe('encaixe didático', () => {
     const allowed = new Set(['substrato:tripsina', 'substrato:trombina', 'mensageiro:beta2', 'raio:beta2'])
     for (const m of Object.values(MOLECULES)) for (const t of Object.values(TARGETS)) for (const p of PERMS) {
       const r = evaluate(m, t, p)
-      if (r.activates) expect(allowed.has(`${m.id}:${t.id}`), `${m.id}:${t.id}`).toBe(true)
+      if (r.activates) expect(m.substrate || allowed.has(`${m.id}:${t.id}`), `${m.id}:${t.id}`).toBe(true)
     }
   })
   it('cada fase tem uma solução', () => {
