@@ -44,6 +44,10 @@ medium water-loving wells and one large oily well. All tray molecules are unchar
 size and oil/water. The correct molecule (Leaf) has two identical water-loving arms, so it always docks by
 **turning** it; it never needs to be flipped over. Stages 2 and 3 keep the +/− charge rules.
 
+In Stage 2 the β2 receptor is tilted towards the player (40°) so the colours and sizes of the wells are easy to
+see, and the Stage 2 "Bolt" (Raio) has a **red (−) tip**, so it is clearly different from Shield (Escudo), the
+right answer.
+
 ## Analytics
 
 Visits are measured with Google Analytics 4 (property **EncaixePerfeito**, measurement ID `G-85PTRY5D21`).

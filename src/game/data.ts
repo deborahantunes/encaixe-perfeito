@@ -15,7 +15,7 @@ export type Cavity = { size: 1 | 2 | 3; chem: Chem }
 export type MoleculeId =
   | 'substrato' | 'mensageiro'
   | 'cometa' | 'trevo' | 'escudo' | 'raio' | 'gota' | 'gigante' | 'faisca' | 'pluma'
-  | 'alimento' | 'folha' | 'grao' | 'nuvem'
+  | 'alimento' | 'folha' | 'grao' | 'nuvem' | 'raio2'
 
 export type TargetId = 'tripsina' | 'tripsina_facil' | 'trombina' | 'beta2'
 
@@ -89,6 +89,13 @@ export const MOLECULES: Record<MoleculeId, MoleculeDef> = {
     about: 'Molécula inventada parecida com o mensageiro natural, mas com uma parte oleosa maior.',
     groups: [g(1, 'pos'), g(3, 'oil'), g(2, 'polar')],
   },
+  // Stage 2 version of Raio: NEGATIVE tip (red), so children tell it apart from Escudo at a glance
+  // (it is pushed away by the receptor's negative anchor). The original Raio stays in the lab and challenges.
+  raio2: {
+    id: 'raio2', name: 'Molécula Raio', tint: 0xfff3a0,
+    about: 'Molécula inventada parecida com a Escudo, mas com a ponta NEGATIVA (−).',
+    groups: [g(1, 'neg'), g(3, 'oil'), g(2, 'polar')],
+  },
   gota: {
     id: 'gota', name: 'Molécula Gota', tint: 0xc8f7ff,
     about: 'Molécula inventada que só gosta de água. Não tem nenhuma carga.',
@@ -155,7 +162,7 @@ export const TARGETS: Record<TargetId, TargetDef> = {
     id: 'beta2', name: 'Receptor β2', short: 'receptor β2', pdb: '2RH1', color: 0x8fc8ff,
     role: 'Receptor na parede da célula. Ligado, manda a célula do pulmão relaxar.',
     cavities: [{ size: 1, chem: 'neg' }, { size: 3, chem: 'oil' }, { size: 2, chem: 'polar' }],
-    anchor: 0, switchCavity: 2, effect: 'Recado enviado', word: 'Ligou!', sideTilt: 58,
+    anchor: 0, switchCavity: 2, effect: 'Recado enviado', word: 'Ligou!', sideTilt: 40,
   },
 }
 
@@ -195,7 +202,7 @@ export const LEVELS: LevelDef[] = [
     id: 2, kind: 'block', title: 'Fase 2 · Ligar ou bloquear?',
     intro: 'O receptor β2 atravessa a membrana da célula. O bolso fica do lado de FORA. Quando o mensageiro natural encaixa e aperta o "interruptor" (anel tracejado), um recado passa para DENTRO da célula.',
     goal: 'Encontre a molécula que ocupa o receptor SEM apertar o interruptor, para o recado parar.',
-    targets: ['beta2'], tray: ['gota', 'raio', 'cometa', 'pluma', 'escudo'], natural: 'mensageiro',
+    targets: ['beta2'], tray: ['gota', 'raio2', 'cometa', 'pluma', 'escudo'], natural: 'mensageiro',
     learned: 'Moléculas que encaixam e LIGAM o receptor se chamam agonistas. As que encaixam e só BLOQUEIAM se chamam antagonistas. As duas encaixam, mas fazem coisas opostas! A Escudo tem a ponta que gosta de água curtinha demais: não alcança o interruptor.',
   },
   {

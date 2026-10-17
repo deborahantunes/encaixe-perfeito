@@ -45,6 +45,14 @@ describe('encaixe didático', () => {
     expect(strong.some(p => PERMS.slice(0, 3).includes(p))).toBe(true)
     expect(strong.some(p => PERMS.slice(3).includes(p))).toBe(true)
   })
+  it('fase 2: a Raio da fase 2 tem ponta vermelha (−) e é repelida; só a Escudo bloqueia', () => {
+    const lv = LEVELS[2]
+    expect(lv.tray).toContain('raio2')
+    expect(MOLECULES.raio2.groups.some(gr => gr.chem === 'neg')).toBe(true)
+    expect(best('raio2', 'beta2').fit).toBe('repel')
+    const ok = lv.tray.filter(m => { const r = best(m, 'beta2'); return r.fit === 'strong' && !r.activates })
+    expect(ok).toEqual(['escudo'])
+  })
   it('fase 2: mensageiro e Raio ativam o β2, Escudo bloqueia', () => {
     expect(best('mensageiro', 'beta2')).toMatchObject({ fit: 'strong', activates: true })
     expect(best('raio', 'beta2')).toMatchObject({ fit: 'strong', activates: true })
