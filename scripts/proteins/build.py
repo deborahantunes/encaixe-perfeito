@@ -42,6 +42,10 @@ TARGETS = [
     dict(id='trombina', pdb='1PPB', chains='HL', ligand='0G6', anchor=('H', 189, 'CG'),
          tint=(1.0, 0.68, 0.55), faces=60000,
          cavities=[(2, 'neg'), (3, 'oil'), (2, 'oil')]),
+    # Easy Stage 3: same real thrombin surface with uncharged wells (water, oil, oil) and neutral charged residues.
+    dict(id='trombina_facil', pdb='1PPB', chains='HL', ligand='0G6', anchor=('H', 189, 'CG'),
+         tint=(1.0, 0.68, 0.55), faces=60000, neutral=True,
+         cavities=[(2, 'polar'), (3, 'oil'), (2, 'oil')]),
     dict(id='beta2', pdb='2RH1', chains='A', ligand='CAU', anchor=('A', 113, 'CG'), maxres=999,
          tint=(0.52, 0.76, 1.0), faces=70000, membrane=True,
          cavities=[(1, 'neg'), (3, 'oil'), (2, 'polar')]),

@@ -92,6 +92,37 @@
     ],
     "ligandDepth": -0.0277
   },
+  "trombina_facil": {
+    "id": "trombina_facil",
+    "pdb": "1PPB",
+    "scale": 0.009,
+    "faces": 60000,
+    "bboxMin": [
+      -0.342,
+      -0.2173,
+      -0.3181
+    ],
+    "bboxMax": [
+      0.1815,
+      0.2783,
+      0.1305
+    ],
+    "cavities": [
+      {
+        "size": 2,
+        "chem": "polar"
+      },
+      {
+        "size": 3,
+        "chem": "oil"
+      },
+      {
+        "size": 2,
+        "chem": "oil"
+      }
+    ],
+    "ligandDepth": -0.0277
+  },
   "beta2": {
     "id": "beta2",
     "pdb": "2RH1",

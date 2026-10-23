@@ -16,8 +16,9 @@ export type MoleculeId =
   | 'substrato' | 'mensageiro'
   | 'cometa' | 'trevo' | 'escudo' | 'raio' | 'gota' | 'gigante' | 'faisca' | 'pluma'
   | 'alimento' | 'folha' | 'grao' | 'nuvem' | 'raio2'
+  | 'fibrinogenio' | 'laco' | 'seta'
 
-export type TargetId = 'tripsina' | 'tripsina_facil' | 'trombina' | 'beta2'
+export type TargetId = 'tripsina' | 'tripsina_facil' | 'trombina' | 'trombina_facil' | 'beta2'
 
 export type MoleculeDef = {
   id: MoleculeId
@@ -132,6 +133,23 @@ export const MOLECULES: Record<MoleculeId, MoleculeDef> = {
     about: 'Molécula inventada que é toda oleosa: não tem nenhuma parte que gosta de água.',
     groups: [g(2, 'oil'), g(3, 'oil'), g(2, 'oil')],
   },
+  // Easy Stage 3 (thrombin without charges): natural substrate and the right answer.
+  fibrinogenio: {
+    id: 'fibrinogenio', name: 'Fibrinogênio', natural: true, substrate: true, tint: 0xffd6a5,
+    about: 'Proteína natural do sangue. A trombina corta o fibrinogênio para formar o coágulo.',
+    groups: [g(2, 'polar'), g(3, 'oil'), g(1, 'oil')],
+  },
+  laco: {
+    id: 'laco', name: 'Molécula Laço', tint: 0xffc6e0,
+    about: 'Molécula inventada com DUAS partes oleosas (uma grande e uma média) e uma parte que gosta de água.',
+    groups: [g(2, 'polar'), g(3, 'oil'), g(2, 'oil')],
+  },
+  // Expert decoy: binds strongly to both enzymes, but never as well as the best answer.
+  seta: {
+    id: 'seta', name: 'Molécula Seta', tint: 0xd7f0a8,
+    about: 'Molécula inventada: ponta positiva, parte oleosa grande e uma pontinha oleosa.',
+    groups: [g(2, 'pos'), g(3, 'oil'), g(1, 'oil')],
+  },
   pluma: {
     id: 'pluma', name: 'Molécula Pluma', tint: 0xe6c8ff,
     about: 'Molécula inventada bem pequena e leve.',
@@ -158,6 +176,12 @@ export const TARGETS: Record<TargetId, TargetDef> = {
     cavities: [{ size: 2, chem: 'neg' }, { size: 3, chem: 'oil' }, { size: 2, chem: 'oil' }],
     anchor: 0, switchCavity: -1, effect: 'Formando coágulo', word: 'Coágulo!',
   },
+  trombina_facil: {
+    id: 'trombina_facil', name: 'Trombina', short: 'trombina', pdb: '1PPB', color: 0xffb08f,
+    role: 'Enzima da coagulação: ajuda a formar coágulos no sangue.',
+    cavities: [{ size: 2, chem: 'polar' }, { size: 3, chem: 'oil' }, { size: 2, chem: 'oil' }],
+    anchor: -1, switchCavity: -1, effect: 'Formando coágulo', word: 'Coágulo!',
+  },
   beta2: {
     id: 'beta2', name: 'Receptor β2', short: 'receptor β2', pdb: '2RH1', color: 0x8fc8ff,
     role: 'Receptor na parede da célula. Ligado, manda a célula do pulmão relaxar.',
@@ -166,10 +190,22 @@ export const TARGETS: Record<TargetId, TargetDef> = {
   },
 }
 
-export type LevelKind = 'tutorial' | 'block' | 'activate' | 'selective' | 'lab'
+export type LevelKind = 'block' | 'activate' | 'best' | 'selective' | 'lab'
+
+/** Difficulty: Fácil (children: shape + oil/water, turning is enough), Padrão (charges, turn AND flip), Especialista. */
+export type Tier = 'facil' | 'padrao' | 'especialista'
+export const TIERS: Tier[] = ['facil', 'padrao', 'especialista']
+export const TIER_NAME: Record<Tier, string> = { facil: 'Fácil', padrao: 'Padrão', especialista: 'Especialista' }
+export const TIER_ABOUT: Record<Tier, string> = {
+  facil: 'Para crianças: só formato, óleo e água. Basta girar a molécula.',
+  padrao: 'Cargas + e −, interruptor do receptor e seletividade. É preciso girar e virar.',
+  especialista: 'Para quem conhece docking: mais moléculas parecidas, nota do encaixe e nenhuma ajuda.',
+}
 
 export type LevelDef = {
+  /** Stable id (saved progress, analytics, group-challenge protocol). */
   id: number
+  tier: Tier | 'lab'
   title: string
   intro: string
   goal: string
@@ -183,45 +219,115 @@ export type LevelDef = {
   learned: string
   /** Turn-only docking: flipping the molecule over is never needed (hands-only play with children). */
   turnOnly?: boolean
+  /** Time limit of this stage in the group challenge (s). */
+  seconds: number
 }
 
 export const LEVELS: LevelDef[] = [
+  // ------------------------------------------------------------------ Fácil (children)
   {
-    id: 0, kind: 'tutorial', title: 'Tutorial · Como jogar',
-    intro: 'Aprenda a pegar, girar e encaixar uma molécula no bolso de uma proteína de verdade.',
-    goal: 'Siga os passos abaixo.',
-    targets: ['tripsina'], tray: ['faisca', 'cometa'], natural: 'substrato',
-    learned: 'Pronto, você já sabe jogar! A molécula certa ocupou o bolso e a molécula natural não conseguiu entrar: a enzima ficou travada. É assim que muitos remédios funcionam. Agora tente as fases.',
-  },
-  {
-    id: 1, kind: 'block', title: 'Fase 1 · A chave certa',
+    id: 1, tier: 'facil', kind: 'block', title: 'Fase 1 · A chave certa', seconds: 90,
     intro: 'A tripsina é uma enzima de verdade: ela corta proteínas. Uma molécula pode entrar no bolso dela e travá-la, como uma chave errada presa na fechadura.',
     goal: 'Teste as moléculas no bolso da tripsina e descubra qual trava a enzima de vez.',
     targets: ['tripsina_facil'], tray: ['gota', 'gigante', 'folha', 'grao', 'nuvem'], natural: 'alimento', turnOnly: true,
     learned: 'Para encaixar, a molécula precisa ter o TAMANHO e a QUÍMICA certos para o bolso: parte oleosa no buraco oleoso e parte que gosta de água no buraco que gosta de água. A Folha encaixou direitinho e travou a enzima!',
   },
   {
-    id: 2, kind: 'block', title: 'Fase 2 · Ligar ou bloquear?',
+    id: 2, tier: 'facil', kind: 'block', title: 'Fase 2 · Ligar ou bloquear?', seconds: 90,
     intro: 'O receptor β2 atravessa a membrana da célula. O bolso fica do lado de FORA. Quando o mensageiro natural encaixa e aperta o "interruptor" (anel tracejado), um recado passa para DENTRO da célula.',
     goal: 'Encontre a molécula que ocupa o receptor SEM apertar o interruptor, para o recado parar.',
     targets: ['beta2'], tray: ['gota', 'raio2', 'cometa', 'pluma', 'escudo'], natural: 'mensageiro', turnOnly: true,
     learned: 'Moléculas que encaixam e LIGAM o receptor se chamam agonistas. As que encaixam e só BLOQUEIAM se chamam antagonistas. As duas encaixam, mas fazem coisas opostas! A Escudo tem a ponta que gosta de água curtinha demais: não alcança o interruptor.',
   },
   {
-    id: 3, kind: 'selective', title: 'Fase 3 · A molécula que escolhe',
+    id: 3, tier: 'facil', kind: 'block', title: 'Fase 3 · Trave a trombina', seconds: 90,
+    intro: 'A trombina é a enzima que ajuda o sangue a coagular: ela corta o fibrinogênio. O bolso dela tem DOIS buracos oleosos.',
+    goal: 'Encontre a molécula que trava a trombina.',
+    targets: ['trombina_facil'], tray: ['gota', 'folha', 'laco', 'gigante', 'grao'], natural: 'fibrinogenio', turnOnly: true,
+    learned: 'Cada proteína tem um bolso diferente. A Laço tem duas partes oleosas, do tamanho certo para os dois buracos oleosos da trombina. A Folha só tem uma: encaixou fraco.',
+  },
+  // ------------------------------------------------------------------ Padrão
+  {
+    id: 11, tier: 'padrao', kind: 'block', title: 'Fase 1 · Trave a tripsina', seconds: 90,
+    intro: 'A tripsina corta proteínas. No fundo do bolso dela há uma âncora com carga NEGATIVA (−): só gruda quem tiver uma ponta positiva (+).',
+    goal: 'Encaixe FORTE no bolso da tripsina para travar a enzima.',
+    targets: ['tripsina'], tray: ['gota', 'faisca', 'cometa', 'pluma', 'gigante'], natural: 'substrato',
+    learned: 'A Cometa tem ponta positiva para a âncora negativa, parte oleosa grande e uma pontinha que gosta de água. Muitos remédios travam enzimas assim: ocupam o bolso e a molécula natural não entra.',
+  },
+  {
+    id: 12, tier: 'padrao', kind: 'block', title: 'Fase 2 · Bloqueie o receptor', seconds: 90,
+    intro: 'O receptor β2 manda um recado para dentro da célula quando o interruptor (anel tracejado) é apertado.',
+    goal: 'Ocupe o receptor β2 SEM apertar o interruptor.',
+    targets: ['beta2'], tray: ['raio', 'gota', 'escudo', 'cometa', 'pluma'], natural: 'mensageiro',
+    learned: 'A Escudo encaixa, mas a ponta que gosta de água é curta demais para apertar o interruptor: é um antagonista (bloqueador).',
+  },
+  {
+    id: 13, tier: 'padrao', kind: 'activate', title: 'Fase 3 · Ligue o receptor', seconds: 90,
+    intro: 'Agora é o contrário: queremos que o receptor β2 mande o recado, como faz o mensageiro natural.',
+    goal: 'Encaixe FORTE e aperte o interruptor do receptor β2.',
+    targets: ['beta2'], tray: ['escudo', 'pluma', 'raio', 'faisca', 'gota'], natural: 'mensageiro',
+    learned: 'A Raio encaixa e aperta o interruptor: é um agonista, faz o mesmo que o mensageiro natural.',
+  },
+  {
+    id: 14, tier: 'padrao', kind: 'block', title: 'Fase 4 · Trave a trombina', seconds: 90,
+    intro: 'A trombina ajuda o sangue a coagular. O bolso dela parece com o da tripsina, mas tem DOIS buracos oleosos.',
+    goal: 'Encaixe FORTE no bolso da trombina.',
+    targets: ['trombina'], tray: ['cometa', 'gota', 'trevo', 'faisca', 'pluma'], natural: 'substrato',
+    learned: 'A Trevo tem duas partes oleosas, uma grande e uma média: combina com os dois buracos oleosos da trombina.',
+  },
+  {
+    id: 15, tier: 'padrao', kind: 'selective', title: 'Fase 5 · A molécula que escolhe', seconds: 100,
     intro: 'Trombina e tripsina são enzimas "primas": os bolsos são parecidos. Queremos travar a trombina (coagulação) sem atrapalhar a tripsina (digestão).',
     goal: 'Trave a TROMBINA e deixe a TRIPSINA livre. A molécula testa as duas ao mesmo tempo.',
     targets: ['tripsina', 'trombina'], tray: ['faisca', 'cometa', 'gigante', 'trevo'], blockTarget: 'trombina',
     learned: 'Moléculas SELETIVAS encaixam bem só no alvo certo. A Trevo tem uma parte média oleosa que cabe no bolsinho da trombina, mas é grande demais para o da tripsina. Menos efeitos indesejados!',
   },
+  // ------------------------------------------------------------------ Especialista
   {
-    id: 4, kind: 'lab', title: 'Laboratório livre',
+    id: 21, tier: 'especialista', kind: 'best', title: 'Fase 1 · O melhor encaixe', seconds: 120,
+    intro: 'Várias moléculas encaixam forte na tripsina. Num projeto de fármaco, escolhemos a de MAIOR afinidade. Aqui cada encaixe recebe uma nota de 0 a 100.',
+    goal: 'Encontre a molécula com a MAIOR nota de encaixe na tripsina.',
+    targets: ['tripsina'], tray: ['escudo', 'seta', 'cometa', 'raio', 'gota', 'trevo'],
+    learned: 'Escudo, Seta e Cometa encaixam forte, mas só a Cometa preenche os três buracos com o tamanho e a química exatos (nota 100). É o mesmo raciocínio de ordenar moléculas por pontuação num docking virtual.',
+  },
+  {
+    id: 22, tier: 'especialista', kind: 'activate', title: 'Fase 2 · Agonista entre impostores', seconds: 120,
+    intro: 'Seis moléculas parecidas. Várias escorregam, uma encaixa mas só bloqueia. Apenas uma LIGA o receptor β2.',
+    goal: 'Encontre o agonista: encaixe forte que aperta o interruptor do β2.',
+    targets: ['beta2'], tray: ['escudo', 'cometa', 'raio', 'faisca', 'pluma', 'gota'],
+    learned: 'O interruptor só é apertado quando a parte que gosta de água tem o tamanho EXATO do buraco. A Escudo encaixa tão bem quanto, mas sem ativar: antagonista.',
+  },
+  {
+    id: 23, tier: 'especialista', kind: 'best', title: 'Fase 3 · O melhor na trombina', seconds: 120,
+    intro: 'Na trombina, mais de uma molécula encaixa forte. Compare as notas de encaixe.',
+    goal: 'Encontre a molécula com a MAIOR nota de encaixe na trombina.',
+    targets: ['trombina'], tray: ['cometa', 'seta', 'trevo', 'escudo', 'nuvem', 'gigante'],
+    learned: 'A Seta encaixa forte, mas a pontinha oleosa sobra no buraco médio. A Trevo preenche os dois buracos oleosos por inteiro: nota 100.',
+  },
+  {
+    id: 24, tier: 'especialista', kind: 'selective', title: 'Fase 4 · Seletividade fina', seconds: 120,
+    intro: 'Agora várias moléculas grudam nas DUAS enzimas. Pense no buraco que é diferente entre elas.',
+    goal: 'Trave a TROMBINA e deixe a TRIPSINA totalmente livre.',
+    targets: ['tripsina', 'trombina'], tray: ['cometa', 'seta', 'trevo', 'escudo', 'faisca', 'gigante'], blockTarget: 'trombina',
+    learned: 'Cometa, Seta e Escudo cabem no buraco pequeno da tripsina: grudam nas duas enzimas. Só a Trevo, com a parte média oleosa, é grande demais para a tripsina. Seletividade vem de explorar a diferença entre os bolsos.',
+  },
+  // ------------------------------------------------------------------ free lab bench
+  {
+    id: 90, tier: 'lab', kind: 'lab', title: 'Bancada livre', seconds: 0,
     intro: 'Agora você é cientista! Escolha uma proteína e teste qualquer molécula.',
     goal: 'Escolha o alvo nos botões e teste todas as moléculas. O caderno anota os resultados.',
     targets: ['tripsina'], tray: ['cometa', 'trevo', 'escudo', 'raio', 'pluma', 'gota', 'gigante', 'faisca', 'substrato', 'mensageiro'],
     learned: '',
   },
 ]
+
+export const LEVEL_BY_ID = new Map(LEVELS.map(l => [l.id, l]))
+export const LAB_LEVEL = LEVELS.find(l => l.kind === 'lab')!
+
+/** The stages of one difficulty, in play order. */
+export function stagesOf(tier: Tier): LevelDef[] {
+  return LEVELS.filter(l => l.tier === tier)
+}
 
 export const CHEM_LABEL: Record<Chem, string> = {
   pos: 'carga +', neg: 'carga −', oil: 'oleosa', polar: 'gosta de água',

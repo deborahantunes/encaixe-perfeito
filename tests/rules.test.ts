@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { LEVELS, MOLECULES, TARGETS, type MoleculeId, type TargetId } from '../src/game/data'
+import { LEVELS, LEVEL_BY_ID, MOLECULES, TARGETS, TIERS, stagesOf, type MoleculeId, type TargetId } from '../src/game/data'
+import { judge } from '../src/game/challenges'
 import { bestFit, evaluate, evaluateTurnOnly, PERMS, type Perm } from '../src/game/rules'
 import PROTEINS from '../src/game/proteins.json'
 
@@ -13,7 +14,7 @@ describe('encaixe didático', () => {
     }
     for (const l of LEVELS) expect(banned.test(l.intro + l.goal + l.learned), l.title).toBe(false)
   })
-  it('tutorial e laboratório: só a Cometa trava a tripsina (com carga)', () => {
+  it('padrão e laboratório: só a Cometa trava a tripsina (com carga)', () => {
     expect(best('cometa', 'tripsina')).toMatchObject({ fit: 'strong', activates: false })
     expect(best('gota', 'tripsina').fit).toBe('slip')
     expect(best('gigante', 'tripsina').fit).toBe('clash')
@@ -25,7 +26,7 @@ describe('encaixe didático', () => {
     expect(r.fit).toBe('repel')
   })
   it('fase 1 (crianças): bolso e bandeja sem nenhuma carga, só óleo e água', () => {
-    const lv = LEVELS[1]
+    const lv = LEVEL_BY_ID.get(1)!
     expect(lv.targets).toEqual(['tripsina_facil'])
     const charged = (c: string) => c === 'pos' || c === 'neg'
     expect(TARGETS.tripsina_facil.cavities.some(c => charged(c.chem))).toBe(false)
@@ -46,16 +47,16 @@ describe('encaixe didático', () => {
     expect(strong.some(p => PERMS.slice(3).includes(p))).toBe(true)
   })
   it('fase 2: a Raio da fase 2 tem ponta vermelha (−) e é repelida; só a Escudo bloqueia', () => {
-    const lv = LEVELS[2]
+    const lv = LEVEL_BY_ID.get(2)!
     expect(lv.tray).toContain('raio2')
     expect(MOLECULES.raio2.groups.some(gr => gr.chem === 'neg')).toBe(true)
     expect(best('raio2', 'beta2').fit).toBe('repel')
     const ok = lv.tray.filter(m => { const r = best(m, 'beta2'); return r.fit === 'strong' && !r.activates })
     expect(ok).toEqual(['escudo'])
   })
-  it('fases 1 e 2: a molécula certa encaixa só GIRANDO (de qualquer lado, sem virar)', () => {
-    for (const [lv, m] of [[1, 'folha'], [2, 'escudo']] as const) {
-      const level = LEVELS[lv]
+  it('nível fácil: a molécula certa encaixa só GIRANDO (de qualquer lado, sem virar)', () => {
+    for (const [lv, m] of [[1, 'folha'], [2, 'escudo'], [3, 'laco']] as const) {
+      const level = LEVEL_BY_ID.get(lv)!
       expect(level.turnOnly, level.title).toBe(true)
       const t = TARGETS[level.targets[0]]
       // Whatever face the hand shows (all 6 orientations), one of the 3 turns docks strongly.
@@ -82,7 +83,7 @@ describe('encaixe didático', () => {
     expect(best('cometa', 'tripsina').fit).toBe('strong')
   })
   it('a resposta certa combina cor com cor (sem parte na química errada)', () => {
-    for (const [m, t] of [['cometa', 'tripsina'], ['folha', 'tripsina_facil'], ['escudo', 'beta2'], ['trevo', 'trombina']] as const) {
+    for (const [m, t] of [['cometa', 'tripsina'], ['folha', 'tripsina_facil'], ['laco', 'trombina_facil'], ['escudo', 'beta2'], ['trevo', 'trombina']] as const) {
       const r = best(m, t)
       expect(r.slots.every(sl => sl.chem !== 'mismatch'), `${m}:${t}`).toBe(true)
     }
@@ -94,16 +95,38 @@ describe('encaixe didático', () => {
       if (r.activates) expect(m.substrate || allowed.has(`${m.id}:${t.id}`), `${m.id}:${t.id}`).toBe(true)
     }
   })
-  it('cada fase tem uma solução', () => {
-    for (const level of LEVELS.filter(l => l.kind === 'block')) {
-      expect(level.tray.some(m => { const r = best(m, level.targets[0]); return r.fit === 'strong' && !r.activates })).toBe(true)
+  it('cada fase tem exatamente UMA molécula certa', () => {
+    const sol = (id: number) => { const l = LEVEL_BY_ID.get(id)!; return l.tray.filter(m => PERMS.some(p => judge(l, m, p).ok)) }
+    expect(stagesOf('facil').map(l => sol(l.id))).toEqual([['folha'], ['escudo'], ['laco']])
+    expect(stagesOf('padrao').map(l => sol(l.id))).toEqual([['cometa'], ['escudo'], ['raio'], ['trevo'], ['trevo']])
+    expect(stagesOf('especialista').map(l => sol(l.id))).toEqual([['cometa'], ['raio'], ['trevo'], ['trevo']])
+  })
+  it('níveis padrão e especialista: a molécula certa precisa da orientação certa (girar E virar)', () => {
+    for (const tier of ['padrao', 'especialista'] as const) for (const l of stagesOf(tier)) {
+      if (l.kind === 'selective') continue
+      expect(l.turnOnly, l.title).toBeFalsy()
+      const m = l.tray.find(x => PERMS.some(p => judge(l, x, p).ok))!
+      expect(PERMS.filter(p => judge(l, m, p).ok).length, l.title).toBeLessThan(6)
     }
-    const sel = LEVELS.find(l => l.kind === 'selective')!
-    const ok = sel.tray.filter(m => sel.targets.every(t => {
-      const r = best(m, t)
-      return t === sel.blockTarget ? r.fit === 'strong' && !r.activates : r.fit !== 'strong' && r.fit !== 'weak'
-    }))
-    expect(ok).toEqual(['trevo'])
+  })
+  it('nível fácil: fases 1 e 3 sem nenhuma carga (só formato, óleo e água)', () => {
+    const charged = (c: string) => c === 'pos' || c === 'neg'
+    for (const id of [1, 3]) {
+      const lv = LEVEL_BY_ID.get(id)!
+      for (const tg of lv.targets) expect(TARGETS[tg].cavities.some(c => charged(c.chem))).toBe(false)
+      for (const m of [...lv.tray, lv.natural!]) expect(MOLECULES[m].groups.some(gr => charged(gr.chem)), m).toBe(false)
+    }
+  })
+  it('especialista "melhor encaixe": outras moléculas também encaixam forte, com nota menor', () => {
+    for (const id of [21, 23]) {
+      const l = LEVEL_BY_ID.get(id)!
+      const strong = l.tray.filter(m => { const r = best(m, l.targets[0]); return r.fit === 'strong' && !r.activates })
+      expect(strong.length, l.title).toBeGreaterThanOrEqual(2)
+    }
+  })
+  it('ids das fases são únicos e todos os níveis têm fases', () => {
+    expect(new Set(LEVELS.map(l => l.id)).size).toBe(LEVELS.length)
+    for (const tier of TIERS) expect(stagesOf(tier).length).toBeGreaterThanOrEqual(3)
   })
   it('as superfícies 3D foram geradas com os mesmos bolsos dos dados', () => {
     for (const t of Object.values(TARGETS)) {

@@ -1,0 +1,16 @@
+# Render blueprint for the "Desafio em grupo" room server (free plan).
+# One-time setup: https://render.com/deploy?repo=https://github.com/deborahantunes/encaixe-perfeito
+services:
+  - type: web
+    name: encaixe-desafio
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install --omit=dev
+    startCommand: node server.mjs
+    healthCheckPath: /healthz
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: ALLOWED_ORIGINS
+        value: https://deborahantunes.github.io

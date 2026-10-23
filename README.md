@@ -22,35 +22,80 @@ The game is available in Portuguese (pt-BR), English and Spanish.
 
 After one online visit the game is stored on the device and also works **offline**.
 
+## Three ways to play
+
+The main menu has three modes:
+
+1. **Free lab (Laboratório livre):** choose a difficulty and any stage, or the free bench (any protein, any
+   molecule, with a lab notebook).
+2. **Event mode (Modo evento):** a visitor queue at fairs and open days (hands only, restarts by itself).
+3. **Group challenge (Desafio em grupo):** up to 4 headsets play the same challenges at the same time, with a
+   scoreboard on a projector.
+
+### Difficulties and stages
+
+| Difficulty | Stages | Idea |
+| --- | --- | --- |
+| **Fácil** (easy, children) | 1 A chave certa · 2 Ligar ou bloquear? · 3 Trave a trombina | Shape + oil/water; turning is enough (turn-only docking) |
+| **Padrão** (standard) | 1 Trave a tripsina · 2 Bloqueie o receptor · 3 Ligue o receptor · 4 Trave a trombina · 5 A molécula que escolhe | +/− charges, agonist vs antagonist, selectivity; turn **and** flip |
+| **Especialista** (expert) | 1 O melhor encaixe · 2 Agonista entre impostores · 3 O melhor na trombina · 4 Seletividade fina | Look-alike decoys, a 0–100 fit score, rank by affinity, no help |
+
+Every stage has exactly one correct molecule (checked by `tests/rules.test.ts`). Easy Stages 1 and 3 use
+uncharged versions of the real trypsin (PDB 1BJU) and thrombin (PDB 1PPB) pockets. In the easy stages the
+molecule settles on its correct face by itself, so it never has to be flipped over by hand. The β2 receptor
+(PDB 2RH1) is tilted 40° towards the player so the wells are easy to see. The old tutorial was removed: the
+first stage of each difficulty explains how to grab and turn a molecule.
+
 ## Event mode (visitor queue)
 
 Designed for science fairs and open-house events with many visitors, including young children, using
 **hand tracking only** (no controllers needed after the staff presses START once):
 
-- Each visitor plays the stages in a row, with no menu. The next stage starts automatically after each win.
-- At the end the panel shows only **Congratulations!** (no clock) and, after a few seconds, the game restarts
-  by itself for the next person. If nobody interacts for 3 minutes, it also restarts from the first stage.
+- Each visitor plays the first N stages of one difficulty in a row, with no menu. The next stage starts
+  automatically after each win.
+- At the end the panel shows **Congratulations!** and, after a few seconds, the game restarts by itself for the
+  next person. If nobody interacts for 3 minutes, it also restarts from the first stage.
 - There is no "end game" button during play, so a child cannot leave the game by accident.
-- Staff choose how many stages each visitor plays: **1 stage** (Stage 1), **2 stages** (Stages 1–2) or
-  **3 stages** (full game). Choose on the start screen, on the "Staff" row of the in-headset panel (shown on the
-  start panel and during the congratulations screen), or with the URL: `?evento=1`, `?evento=2`, `?evento=3`
-  (`?evento=0` turns it off). The choice is saved on the device.
+- Staff choose the **difficulty** and the **number of stages** on the in-headset panel ("Nível" and "Fases"
+  rows), on the start screen (difficulty), or with the URL: `?evento=3&nivel=facil` (`nivel` = `facil`,
+  `padrao` or `especialista`; `?evento=0` turns it off). The choice is saved on the device.
 - The language is chosen on the start screen (Português / English / Español); the whole game follows it.
 
-### Stage 1 is designed for young children
+## Group challenge (Desafio em grupo)
 
-Stage 1 uses the real trypsin surface (PDB 1BJU) with a simplified pocket that has **no charges**: two
-medium water-loving wells and one large oily well. All tray molecules are uncharged, too, so the only ideas are
-size and oil/water. The correct molecule (Leaf) has two identical water-loving arms, so it always docks by
-**turning** it; it never needs to be flipped over. Stages 2 and 3 keep the +/− charge rules.
+For a class or a group with up to **4 Meta Quest headsets** and one computer connected to a projector.
+Everything runs in the browser; the headsets and the computer only need internet.
 
-In Stage 2 the β2 receptor is tilted towards the player (40°) so the colours and sizes of the wells are easy to
-see, and the Stage 2 "Bolt" (Raio) has a **red (−) tip**, so it is clearly different from Shield (Escudo), the
-right answer.
+1. On the computer, open **https://deborahantunes.github.io/encaixe-perfeito/placar.html** (teacher screen) and
+   click **Criar sala**. A 4-digit room code appears.
+2. On each headset, open the game, choose **Desafio em grupo** and type the code (or type it on the start screen
+   before entering VR, or open the direct link `?sala=1234`). Each headset picks a team color.
+3. On the teacher screen, choose the difficulty and the number of challenges, rename the teams if you like, and
+   click **Começar o desafio**.
+4. All headsets play the same stage at the same time. Points: 100 for solving it, up to +100 for speed,
+   +50 if it was the first try, −15 per wrong try (never below 50). Ties are broken by total time.
+5. The teacher screen shows a live 3D view of each team's table, the timer, every docking attempt, the
+   results after each challenge and the final podium. The headsets show the ranking too.
 
-Stages 1 and 2 use **turn-only docking**: which face of the molecule the player shows does not matter. Turning it
-until the tip with the dot (or the right colour) points at the matching hole is enough; the molecule settles on
-its correct face by itself, so it never needs to be flipped over by hand.
+Each player handles only their own molecules, so a slow Wi-Fi does not affect the game; a headset that drops
+comes back to the same team with its points. In **Mixed Reality** the players can see each other in the room.
+
+### Room server (one-time setup)
+
+The rooms live on a tiny Node.js server (`server/server.mjs`, WebSocket). It is deployed for free on
+[Render](https://render.com) from this repository with the blueprint in `render.yaml`:
+
+1. Open https://render.com/deploy?repo=https://github.com/deborahantunes/encaixe-perfeito and sign in with GitHub.
+2. Confirm the service **encaixe-desafio** (free plan) and click **Deploy**.
+3. The game uses `wss://encaixe-desafio.onrender.com` by default. If Render gives the service another address,
+   put it in `DEFAULT_SERVER` (`src/net/room.ts`), or open the teacher screen and the game once with
+   `?servidor=wss://<address>` (saved on each device).
+
+On the free plan the server sleeps after about 15 minutes without use; the teacher screen wakes it up when it is
+opened (the first time it can take up to a minute) and keeps it awake while it stays open.
+
+To run it locally: `pnpm server` (port 8790). The game and the teacher screen served from `localhost` use the
+local server automatically.
 
 ## Analytics
 
@@ -60,10 +105,11 @@ Besides page views, the game sends a few custom events:
 
 | Event | Parameters |
 | --- | --- |
-| `play_start` | `mode` (`vr`, `mixed_reality`, `browser`), `event_phases` |
-| `level_complete` | `level`, `event_mode`, `xr` |
-| `event_run_start` | `phases` |
-| `event_run_complete` | `phases`, `total_seconds`, `day_record` |
+| `play_start` | `mode` (`vr`, `mixed_reality`, `browser`), `event_phases`, `tier`, `group` |
+| `level_complete` | `level`, `tier`, `event_mode`, `group`, `xr` |
+| `event_run_start` | `phases`, `tier` |
+| `event_run_complete` | `phases`, `tier`, `total_seconds`, `day_record` |
+| `group_join` | `xr` |
 
 ## Development
 
@@ -72,9 +118,11 @@ Requires Node.js 22 and pnpm.
 ```bash
 pnpm install
 pnpm dev                              # development server
-pnpm test                             # docking rules, translations and event-mode tests (vitest)
+pnpm test                             # docking rules, translations, event mode and room server tests (vitest)
 pnpm run manus:build-source           # production build in dist/ (with offline service worker)
-node scripts/smoke.mjs http://127.0.0.1:3000/   # end-to-end browser test
+node scripts/smoke.mjs http://127.0.0.1:3000/   # end-to-end browser test (every stage)
+node scripts/smoke-group.mjs http://127.0.0.1:3000/   # group challenge: server + teacher screen + 2 players
+pnpm build:shared                     # after changing stages or rules: rebuild server/shared/challenges.mjs
 python3 scripts/proteins/build.py     # regenerate public/proteins/*.glb and src/game/proteins.json
 ```
 
@@ -84,12 +132,16 @@ Every push to `main` is built and published to GitHub Pages by `.github/workflow
 
 | File | Contents |
 | --- | --- |
-| `src/game/data.ts` | Molecules, protein targets and stages |
+| `src/game/data.ts` | Molecules, protein targets, difficulties and stages |
+| `src/game/challenges.ts` | Stage judging shared by the game and the room server, group-challenge points |
 | `src/game/rules.ts` | Docking rules (size + chemistry scoring) |
 | `src/core/analytics.ts` | Google Analytics loader and custom events |
 | `src/game/event.ts` | Event mode settings, timing and best time of the day |
 | `src/game/game.ts` | Scene, menus, stages and animations |
 | `src/game/models.ts` | Protein surfaces and 3D molecules |
+| `src/net/room.ts` | Group-challenge client (WebSocket, reconnection, server clock) |
+| `src/placar/` | Teacher screen (`placar.html`): room, settings, live 3D view, ranking and podium |
+| `server/server.mjs` | Room server (rooms, teams, rounds, timers, scoring); `render.yaml` deploys it |
 | `src/core/pointers.ts` | Controllers, hands and mouse |
 | `src/i18n/*.json` | English and Spanish translations (Portuguese text is the key) |
 

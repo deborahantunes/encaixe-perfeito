@@ -1,7 +1,8 @@
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { CHEM_LABEL, LEVELS, MOLECULES, SIZE_LABEL, TARGETS } from '../src/game/data'
+import { CHEM_LABEL, LEVELS, MOLECULES, SIZE_LABEL, TARGETS, TIER_ABOUT, TIER_NAME } from '../src/game/data'
+import { TEAM_NAMES } from '../src/game/challenges'
 import { FIT_TITLE } from '../src/game/rules'
 import en from '../src/i18n/en.json'
 import es from '../src/i18n/es.json'
@@ -18,7 +19,7 @@ function collectKeys() {
   for (const m of Object.values(MOLECULES)) { keys.add(m.name); keys.add(m.about) }
   for (const x of Object.values(TARGETS)) for (const k of [x.name, x.short, x.role, x.effect, x.word]) keys.add(k)
   for (const l of LEVELS) for (const k of [l.title, l.intro, l.goal, l.learned]) if (k) keys.add(k)
-  for (const k of [...Object.values(CHEM_LABEL), ...SIZE_LABEL, ...Object.values(FIT_TITLE)]) keys.add(k)
+  for (const k of [...Object.values(CHEM_LABEL), ...SIZE_LABEL, ...Object.values(FIT_TITLE), ...Object.values(TIER_NAME), ...Object.values(TIER_ABOUT), ...TEAM_NAMES]) keys.add(k)
   return [...keys].sort()
 }
 

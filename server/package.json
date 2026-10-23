@@ -1,0 +1,11 @@
+{
+  "name": "encaixe-desafio-server",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Encaixe Molecular: room server of the group challenge (Desafio em grupo)",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": { "start": "node server.mjs" },
+  "engines": { "node": ">=20" },
+  "dependencies": { "ws": "8.18.3" }
+}

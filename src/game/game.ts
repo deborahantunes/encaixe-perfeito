@@ -3,12 +3,16 @@ import type { Audio } from '../core/audio'
 import type { Pointer, Pointers } from '../core/pointers'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { CONFIG } from './config'
-import { CHEM_COLOR, LEVELS, MOLECULES, TARGETS, type LevelDef, type MoleculeDef, type MoleculeId, type TargetId } from './data'
+import { CHEM_COLOR, LAB_LEVEL, LEVEL_BY_ID, MOLECULES, TARGETS, TIERS, TIER_ABOUT, TIER_NAME, stagesOf, type LevelDef, type MoleculeDef, type MoleculeId, type TargetId, type Tier } from './data'
 import { Fx } from './fx'
 import { armDir, buildMolecule, buildReceptor, labelTexture, type ReceptorModel } from './models'
 import { MINT, Panel, fitFont, font, roundRect, wrapText } from './panel'
+import { placeReceptor, receptorX } from './layout'
 import { t } from '../i18n'
-import { EVENT_LEVELS, bestToday, saveBest, saveEventSetting, type EventPhases } from './event'
+import { bestToday, fmtTime, lastEventSetting, normalizeEvent, rememberEventSetting, saveBest, saveEventSetting, type EventSetting } from './event'
+import { TEAM_NAMES, bestAffinity } from './challenges'
+import { RoomClient, serverUrl, type Judged, type PoseMol, type RoomState, type TeamState } from '../net/room'
+import { ranking, teamName } from '../net/ranking'
 import { recordError } from '../core/errlog'
 import { track } from '../core/analytics'
 import { FIT_TITLE, PERMS, bestFit, effectText, evaluate, evaluateTurnOnly, rank, type FitResult, type Perm } from './rules'
@@ -16,8 +20,6 @@ import { FIT_TITLE, PERMS, bestFit, effectText, evaluate, evaluateTurnOnly, rank
 const V3 = THREE.Vector3
 const Q = THREE.Quaternion
 const EYE = 1.5
-const POCKET_Y = 1.3
-const POCKET_Z = -0.72
 const FIT_COLOR: Record<string, string> = { strong: '#3ee6b0', weak: '#ffb347', slip: '#c9c4e8', clash: '#ff6b6b', repel: '#ff6b6b' }
 const SAVE_KEY = 'encaixe-molecular:v1'
 
@@ -77,10 +79,12 @@ class Receptor {
 
 type LastResult = { mol: MoleculeDef; target: string; r: FitResult; hint: string; extra?: string; enzyme?: boolean }
 
-export type HudState = { holding: string | null; xr: boolean; mode: 'menu' | 'level'; event: boolean }
+export type HudState = { holding: string | null; xr: boolean; mode: 'menu' | 'level'; event: boolean; group?: boolean }
 
-type EventRun = { phases: EventPhases; step: number; phaseStart: number; times: number[]; lastAction: number }
-type EventResult = { phases: EventPhases; times: number[]; total: number; record: boolean; best: number; at: number }
+type EventRun = { setting: EventSetting; levels: LevelDef[]; step: number; phaseStart: number; times: number[]; lastAction: number }
+type EventResult = { setting: EventSetting; times: number[]; total: number; record: boolean; best: number; at: number }
+type GroupView = 'join' | 'room'
+const FREE_TIER_KEY = 'encaixe-nivel-livre'
 
 export class Game {
   readonly root = new THREE.Group()
@@ -95,9 +99,10 @@ export class Game {
   private menu: Panel
   /** Event-mode lobby (queue of visitors): COMEÇAR button, language and the last visitor's result. */
   private lobby: Panel
-  /** Event mode: 0 = off, otherwise how many levels each visitor plays. */
-  eventPhases: EventPhases = 0
-  private lastEventPhases: EventPhases = 3
+  /** Group challenge panel: room code keypad, team colors, countdown, results and podium. */
+  private groupPanel: Panel
+  /** Event mode: null = off, otherwise the difficulty and how many stages each visitor plays. */
+  event: EventSetting | null = null
   private run: EventRun | null = null
   private result: EventResult | null = null
   private clockSec = -1
@@ -110,7 +115,20 @@ export class Game {
   private won = false
   /** Countdown to a single visit of the natural molecule (0 = none scheduled). */
   private natTimer = 0
-  private tutStep = 0
+  /** Main menu page: the three modes, or the free lab (difficulty tabs + stages). */
+  private menuPage: 'home' | 'free' = 'home'
+  private freeTier: Tier = 'facil'
+  // ---- group challenge ("Desafio em grupo")
+  room: RoomClient | null = null
+  private groupView: GroupView = 'join'
+  private joinCode = ''
+  private joinError = ''
+  private groupRound = -1
+  private groupSolved = false
+  private groupPoints = 0
+  private groupFeedback = ''
+  private poseTimer = 0
+  private groupClock = ''
   /** Seconds until the next level starts automatically after a win (0 = off). */
   private autoNext = 0
   /** NUBBICS logo (group that made the game), shown discreetly on the 3D menu. */
@@ -160,6 +178,12 @@ export class Game {
     this.lobby.mesh.visible = false
     this.menuGroup.add(this.lobby.mesh)
     this.lobby.setDraw((ctx, w, h) => this.drawLobby(ctx, w, h))
+    this.groupPanel = new Panel(0.9, 0.76, 1500)
+    this.groupPanel.mesh.position.set(0, 1.45, -0.74)
+    this.groupPanel.mesh.visible = false
+    this.menuGroup.add(this.groupPanel.mesh)
+    this.groupPanel.setDraw((ctx, w, h) => this.drawGroup(ctx, w, h))
+    try { const ft = localStorage.getItem(FREE_TIER_KEY); if ((TIERS as string[]).includes(ft ?? '')) this.freeTier = ft as Tier } catch { /* ignore */ }
     this.buildMenuDecor()
 
     renderer.xr.addEventListener('sessionstart', () => {
@@ -267,37 +291,62 @@ export class Game {
 
   // ---------------------------------------------------------------- menus & levels
 
-  showMenu(): void {
-    if (this.eventPhases > 0) { this.showLobby(); return }
+  /** Shows one of the three 2D panels of the menu area (main menu, event lobby, group challenge). */
+  private showPanel(which: 'menu' | 'lobby' | 'group'): void {
     this.clearLevel()
-    this.run = null
     this.mode = 'menu'
     this.level = null
+    this.autoNext = 0
     this.menuGroup.visible = true
-    this.menu.mesh.visible = true
-    this.lobby.mesh.visible = false
+    this.menu.mesh.visible = which === 'menu'
+    this.lobby.mesh.visible = which === 'lobby'
+    this.groupPanel.mesh.visible = which === 'group'
     this.mission.mesh.visible = false
     this.legend.mesh.visible = true
-    const b = (id: string, x: number, y: number, w: number, h: number, label: string, onClick: () => void, color?: string) =>
-      ({ id, x, y, w, h, label, onClick, color })
+  }
+
+  showMenu(page: 'home' | 'free' = this.menuPage): void {
+    if (this.room) { this.showGroup(); return }
+    if (this.event) { this.showLobby(); return }
+    this.run = null
+    this.menuPage = page
+    this.showPanel('menu')
+    const b = (id: string, x: number, y: number, w: number, h: number, label: string, onClick: () => void, color?: string, fontPx?: number) =>
+      ({ id, x, y, w, h, label, onClick, color, fontPx })
     const W = this.menu.canvas.width
-    const cw = (W - 120 - 40) / 2
-    this.menu.buttons = LEVELS.map((lv, i) => i === 0
-      ? b(`lv${lv.id}`, 60, 362, W - 120, 108, `${this.done.has(lv.id) ? '✓ ' : ''}${t('Tutorial: aprenda a jogar (recomendado)')}`, () => this.startLevel(i), '#7fc8ff')
-      : b(`lv${lv.id}`, 60 + ((i - 1) % 2) * (cw + 40), 496 + Math.floor((i - 1) / 2) * 132, cw, 110,
-        `${this.done.has(lv.id) ? '✓ ' : ''}${lv.title}`, () => this.startLevel(i), lv.kind === 'lab' ? '#ffd23f' : undefined))
-    this.menu.buttons.push(b('sound', 60, 768, 300, 86, this.audio.muted ? t('Som: desligado') : t('Som: ligado'), () => {
+    const xr = this.renderer.xr.isPresenting
+    if (page === 'home') {
+      this.menu.buttons = [
+        b('free', 60, 372, W - 120, 108, t('Laboratório livre'), () => this.showMenu('free'), MINT, 50),
+        b('event', 60, 498, W - 120, 108, t('Modo evento (fila de visitantes)'), () => this.setEvent(lastEventSetting()), '#ffd23f', 50),
+        b('group', 60, 624, W - 120, 108, t('Desafio em grupo (até 4 óculos)'), () => this.openJoin(), '#7fc8ff', 50),
+      ]
+    } else {
+      const tw = (W - 120 - 2 * 24) / 3
+      this.menu.buttons = TIERS.map((tier, i) => b(`tier-${tier}`, 60 + i * (tw + 24), 226, tw, 84, t(TIER_NAME[tier]), () => {
+        this.freeTier = tier
+        try { localStorage.setItem(FREE_TIER_KEY, tier) } catch { /* ignore */ }
+        this.showMenu('free')
+      }, tier === this.freeTier ? '#ffd23f' : '#8f86c9', 42))
+      const items: LevelDef[] = [...stagesOf(this.freeTier), LAB_LEVEL]
+      const cw = (W - 120 - 30) / 2
+      const rows = Math.ceil(items.length / 2)
+      const bh = rows > 3 ? 78 : 96
+      const gap = rows > 3 ? 12 : 16
+      items.forEach((lv, i) => this.menu.buttons.push(b(`lv${lv.id}`, 60 + (i % 2) * (cw + 30), 386 + Math.floor(i / 2) * (bh + gap), cw, bh,
+        `${this.done.has(lv.id) ? '✓ ' : ''}${lv.title}`, () => this.startLevel(lv), lv.kind === 'lab' ? '#7fc8ff' : undefined, 34)))
+    }
+    const row = 768
+    if (page === 'free') this.menu.buttons.push(b('back', 60, row, 250, 86, t('Voltar'), () => this.showMenu('home'), '#c9c4e8'))
+    this.menu.buttons.push(b('sound', page === 'free' ? 330 : 60, row, 270, 86, this.audio.muted ? t('Som: desligado') : t('Som: ligado'), () => {
       this.audio.muted = !this.audio.muted
       this.showMenu()
     }, '#c9c4e8'))
-    const xr = this.renderer.xr.isPresenting
     if (xr) {
-      // Four buttons in VR: sound, recenter, event mode, exit (the logo moves to the top right).
-      this.menu.buttons[this.menu.buttons.length - 1].w = 270
-      this.menu.buttons.push(b('recenter', 350, 768, 270, 86, t('Recentralizar'), () => { this.needAlign = 1 }, '#c9c4e8'))
-      this.menu.buttons.push(b('exit', 930, 768, 270, 86, t('Sair da RV'), () => { void this.renderer.xr.getSession()?.end() }, '#ff9db5'))
+      // In VR the logo moves to the top right; recenter and exit join the bottom row.
+      this.menu.buttons.push(b('recenter', page === 'free' ? 620 : 350, row, 290, 86, t('Recentralizar'), () => { this.needAlign = 1 }, '#c9c4e8'))
+      this.menu.buttons.push(b('exit', W - 330, row, 270, 86, t('Sair da RV'), () => { void this.renderer.xr.getSession()?.end() }, '#ff9db5'))
     }
-    this.menu.buttons.push(b('event', xr ? 640 : 390, 768, 270, 86, t('Modo evento'), () => this.setEventPhases(this.lastEventPhases), '#ffd23f'))
     this.menu.invalidate()
     this.legend.invalidate()
     this.emitHud()
@@ -305,43 +354,43 @@ export class Game {
 
   // ---------------------------------------------------------------- event mode (fila de visitantes)
 
-  /** Turns event mode on (1, 2 or 3 levels per visitor) or off (0). */
-  setEventPhases(n: EventPhases): void {
-    this.eventPhases = n
-    if (n > 0) this.lastEventPhases = n
-    saveEventSetting(n)
-    if (this.result && this.result.phases !== n) this.result = null
-    if (this.mode === 'menu' || n === 0) { this.run = null; this.showMenu() }
+  /** Turns event mode on (difficulty + number of stages per visitor) or off (null). */
+  setEvent(s: EventSetting | null): void {
+    if (s) { s = normalizeEvent(s); rememberEventSetting(s) }
+    if (s && this.room) this.leaveGroup(false)
+    this.event = s
+    saveEventSetting(s)
+    if (this.result && (!s || this.result.setting.tier !== s.tier || this.result.setting.count !== s.count)) this.result = null
+    if (this.mode === 'menu' || !s) { this.run = null; this.showMenu('home') }
     this.emitHud()
   }
 
   private showLobby(): void {
-    this.clearLevel()
     this.run = null
-    this.mode = 'menu'
-    this.level = null
-    this.autoNext = 0
-    this.menuGroup.visible = true
-    this.menu.mesh.visible = false
-    this.lobby.mesh.visible = true
-    this.mission.mesh.visible = false
-    this.legend.mesh.visible = true
+    this.showPanel('lobby')
     const W = this.lobby.canvas.width
     const b = (id: string, x: number, y: number, w: number, h: number, label: string, onClick: () => void, color?: string, fontPx?: number) =>
       ({ id, x, y, w, h, label, onClick, color, fontPx })
-    const n = this.eventPhases
-    this.lobby.buttons = [b('start', 60, 640, W - 120, 150,
-      n === 1 ? t('COMEÇAR · 1 fase') : t('COMEÇAR · {n} fases', { n }), () => this.startRun(), MINT, 70)]
-    const opts: [EventPhases, string][] = [[1, t('1 fase')], [2, t('2 fases')], [3, t('3 fases')], [0, t('Modo livre')]]
-    opts.forEach(([v, label], i) => this.lobby.buttons.push(b(`ev${v}`, 250 + i * 216, 846, 200, 66, label,
-      () => this.setEventPhases(v), v === n ? '#ffd23f' : '#8f86c9')))
-    this.lobby.buttons.push(b('sound', 60, 936, 280, 66, this.audio.muted ? t('Som: desligado') : t('Som: ligado'), () => {
+    const ev = this.event!
+    const n = ev.count
+    this.lobby.buttons = [b('start', 60, 590, W - 120, 140,
+      n === 1 ? t('COMEÇAR · 1 fase') : t('COMEÇAR · {n} fases', { n }), () => this.startRun(), MINT, 66)]
+    // Staff rows: difficulty, number of stages, free mode.
+    const tiers: [Tier | null, string][] = [...TIERS.map(x => [x, t(TIER_NAME[x])] as [Tier, string]), [null, t('Modo livre')]]
+    tiers.forEach(([tier, label], i) => this.lobby.buttons.push(b(`tier-${tier ?? 'off'}`, 250 + i * 262, 770, 246, 62, label,
+      () => this.setEvent(tier ? { tier, count: tier === ev.tier ? ev.count : stagesOf(tier).length } : null),
+      tier === ev.tier ? '#ffd23f' : tier ? '#8f86c9' : '#c9c4e8', 32)))
+    const max = stagesOf(ev.tier).length
+    for (let k = 1; k <= max; k++) {
+      this.lobby.buttons.push(b(`n${k}`, 250 + (k - 1) * 150, 848, 134, 62, String(k), () => this.setEvent({ tier: ev.tier, count: k }), k === n ? '#ffd23f' : '#8f86c9', 34))
+    }
+    this.lobby.buttons.push(b('sound', 60, 940, 280, 62, this.audio.muted ? t('Som: desligado') : t('Som: ligado'), () => {
       this.audio.muted = !this.audio.muted
       this.showLobby()
-    }, '#c9c4e8'))
+    }, '#c9c4e8', 30))
     if (this.renderer.xr.isPresenting) {
-      this.lobby.buttons.push(b('recenter', 360, 936, 320, 66, t('Recentralizar'), () => { this.needAlign = 1 }, '#c9c4e8'))
-      this.lobby.buttons.push(b('exit', W - 340, 936, 280, 66, t('Sair da RV'), () => { void this.renderer.xr.getSession()?.end() }, '#ff9db5'))
+      this.lobby.buttons.push(b('recenter', 360, 940, 320, 62, t('Recentralizar'), () => { this.needAlign = 1 }, '#c9c4e8', 30))
+      this.lobby.buttons.push(b('exit', W - 340, 940, 280, 62, t('Sair da RV'), () => { void this.renderer.xr.getSession()?.end() }, '#ff9db5', 30))
     }
     this.lobby.invalidate()
     this.legend.invalidate()
@@ -350,36 +399,42 @@ export class Game {
 
   private startRun(): void {
     const now = performance.now()
+    const setting = this.event!
     this.result = null
-    this.run = { phases: this.eventPhases, step: 0, phaseStart: now, times: [], lastAction: now }
-    track('event_run_start', { phases: this.eventPhases })
+    const levels = stagesOf(setting.tier).slice(0, setting.count)
+    this.run = { setting, levels, step: 0, phaseStart: now, times: [], lastAction: now }
+    track('event_run_start', { phases: setting.count, tier: setting.tier })
     this.clockSec = -1
-    this.startLevel(EVENT_LEVELS[0])
+    this.startLevel(levels[0])
   }
 
   /** After the countdown that follows a win: next level, or the final result. */
   private advanceRun(): void {
     const run = this.run!
     run.step++
-    if (run.step >= run.phases) { this.finishRun(); return }
+    if (run.step >= run.levels.length) { this.finishRun(); return }
     run.phaseStart = run.lastAction = performance.now()
     this.clockSec = -1
-    this.startLevel(EVENT_LEVELS[run.step])
+    this.startLevel(run.levels[run.step])
   }
 
   private finishRun(): void {
     const run = this.run!
     const total = run.times.reduce((a, x) => a + x, 0)
-    const prev = bestToday(run.phases)
-    const record = saveBest(run.phases, total)
-    this.result = { phases: run.phases, times: [...run.times], total, record, best: record ? total : prev, at: performance.now() }
+    const prev = bestToday(run.setting)
+    const record = saveBest(run.setting, total)
+    this.result = { setting: run.setting, times: [...run.times], total, record, best: record ? total : prev, at: performance.now() }
     this.clockSec = -1
-    track('event_run_complete', { phases: run.phases, total_seconds: Math.round(total / 1000), day_record: record })
+    track('event_run_complete', { phases: run.setting.count, tier: run.setting.tier, total_seconds: Math.round(total / 1000), day_record: record })
     this.showLobby()
     this.safe('som', () => this.audio.play('win'))
-    for (let i = 0; i < 6; i++) {
+    this.confetti(6, 1.5, -0.6)
+  }
+
+  private confetti(n: number, y: number, z: number): void {
+    for (let i = 0; i < n; i++) {
       window.setTimeout(() => {
-        const p = new V3((Math.random() - 0.5) * 1.0, 1.5 + Math.random() * 0.4, -0.6)
+        const p = new V3((Math.random() - 0.5) * 1.0, y + Math.random() * 0.4, z)
         for (const c of [0x3ee6b0, 0xffd23f, 0xff9db5, 0x7fc8ff]) this.fx.burst(this.worldOf(p), c, 8, 0.5, 0.02, 0.4)
       }, i * 180)
     }
@@ -391,7 +446,7 @@ export class Game {
       // Visitor left the headset mid-game: start over from the first level, ready for the next person.
       if (now - this.run.lastAction > CONFIG.play.eventIdleSeconds * 1000 && !this.won) { this.startRun(); return }
     }
-    if (this.result && this.mode === 'menu') {
+    if (this.result && this.mode === 'menu' && this.lobby.mesh.visible) {
       const left = CONFIG.play.eventResultSeconds - (now - this.result.at) / 1000
       // Hands-only flow: after "Parabéns!" the next game starts by itself (no button to press).
       if (left <= 0) { this.startRun(); return }
@@ -410,39 +465,335 @@ export class Game {
     ctx.fillStyle = MINT
     ctx.font = font(40, 'bold')
     ctx.fillText(t('Como uma molécula encontra seu alvo'), 200, 176)
-    const n = this.eventPhases
+    const ev = this.event
+    if (!ev) return
+    const n = ev.count
     const r = this.result
     if (r) {
       ctx.textAlign = 'center'
       ctx.fillStyle = MINT
       ctx.font = font(150, 'bold')
-      ctx.fillText(t('Parabéns!'), w / 2, 400)
+      ctx.fillText(t('Parabéns!'), w / 2, 380)
       ctx.fillStyle = '#ffffff'
       ctx.font = font(48, 'bold')
-      ctx.fillText(r.phases === 1 ? t('Você completou o desafio!') : t('Você completou as {n} fases!', { n: r.phases }), w / 2, 480)
+      ctx.fillText(r.setting.count === 1 ? t('Você completou o desafio!') : t('Você completou as {n} fases!', { n: r.setting.count }), w / 2, 460)
       ctx.fillStyle = '#ffd23f'
       ctx.font = font(36, 'bold')
       const left = Math.max(1, Math.ceil(CONFIG.play.eventResultSeconds - (performance.now() - r.at) / 1000))
-      ctx.fillText(t('Próximo jogador em {n} s...', { n: left }), w / 2, 570)
+      ctx.fillText(t('Próximo jogador em {n} s...', { n: left }), w / 2, 540)
       ctx.textAlign = 'left'
     } else {
       ctx.fillStyle = MINT
       ctx.font = font(56, 'bold')
-      ctx.fillText(t('Pronto para o próximo jogador!'), 60, 292)
+      ctx.fillText(t('Pronto para o próximo jogador!'), 60, 284)
       ctx.fillStyle = '#d8d3f5'
       ctx.font = font(32)
-      let y = wrapText(ctx, t('Muitos remédios funcionam assim: uma molécula se encaixa numa proteína do corpo, como uma chave na fechadura. Pegue as moléculas, teste o encaixe e descubra o que acontece.'), 60, 352, w - 120, 42, 3)
+      const y = wrapText(ctx, t('Muitos remédios funcionam assim: uma molécula se encaixa numa proteína do corpo, como uma chave na fechadura. Pegue as moléculas, teste o encaixe e descubra o que acontece.'), 60, 340, w - 120, 42, 3)
       ctx.fillStyle = '#ffd23f'
       ctx.font = font(32, 'bold')
-      wrapText(ctx, n === 1 ? t('Você vai jogar 1 fase.') : t('Você vai jogar {n} fases seguidas.', { n }), 60, y + 14, w - 120, 42, 2)
+      const tier = t(TIER_NAME[ev.tier])
+      wrapText(ctx, n === 1 ? t('Nível {tier}: você vai jogar 1 fase.', { tier }) : t('Nível {tier}: você vai jogar {n} fases seguidas.', { tier, n }), 60, y + 14, w - 120, 42, 2)
     }
     ctx.textAlign = 'left'
     ctx.fillStyle = '#9a93c9'
     ctx.font = font(28, 'bold')
-    ctx.fillText(t('Equipe:'), 60, 890)
+    ctx.fillText(t('Nível:'), 60, 812)
+    ctx.fillText(t('Fases:'), 60, 890)
     ctx.font = font(24)
     ctx.fillText(t('Proteínas reais (banco PDB: tripsina 1BJU, trombina 1PPB, receptor β2 2RH1), com bolsos simplificados.'), 60, h - 84)
     ctx.fillText(t('Todas as moléculas são INVENTADAS: o jogo não mostra nem recomenda nenhum remédio de verdade.'), 60, h - 46)
+  }
+
+  // ---------------------------------------------------------------- group challenge ("Desafio em grupo")
+
+  /** Opens the room-code keypad (or joins right away with a code from the URL / start screen). */
+  openJoin(code = ''): void {
+    if (this.event) { this.event = null; saveEventSetting(null) }
+    this.run = null
+    this.groupView = 'join'
+    this.joinError = ''
+    this.joinCode = code.replace(/\D/g, '').slice(0, 4)
+    if (this.joinCode.length === 4) { this.joinRoom(this.joinCode); return }
+    this.showGroup()
+  }
+
+  joinRoom(code: string): void {
+    this.room?.close()
+    this.joinError = ''
+    this.groupRound = -1
+    const room = new RoomClient(serverUrl(), 'player', code)
+    this.room = room
+    this.groupView = 'room'
+    try { sessionStorage.setItem('encaixe-sala-atual', code) } catch { /* ignore */ }
+    room.onState = s => this.safe('desafio em grupo', () => this.applyRoomState(s))
+    room.onStatus = () => this.safe('desafio em grupo', () => { this.groupPanel.invalidate(); this.mission.invalidate() })
+    room.onWelcome = () => this.safe('desafio em grupo', () => this.refreshGroup())
+    room.onJudged = j => this.safe('desafio em grupo', () => this.onJudged(j))
+    room.onError = code => this.safe('desafio em grupo', () => {
+      if (code === 'no_room') {
+        this.leaveGroup(false)
+        this.joinError = t('Sala {code} não encontrada. Confira o código no telão.', { code: room.room })
+        this.groupView = 'join'
+        this.joinCode = ''
+        this.showGroup()
+      } else if (code === 'team_taken') { this.joinError = t('Essa cor já foi escolhida por outro óculos.'); this.groupPanel.invalidate() }
+    })
+    track('group_join', { xr: this.renderer.xr.isPresenting })
+    this.showGroup()
+  }
+
+  /** Leaves the room (the seat stays on the teacher's board until freed there). */
+  leaveGroup(show = true): void {
+    const room = this.room
+    this.room = null
+    room?.close()
+    try { sessionStorage.removeItem('encaixe-sala-atual') } catch { /* ignore */ }
+    this.groupRound = -1
+    if (show) this.showMenu('home')
+  }
+
+  private applyRoomState(s: RoomState): void {
+    const room = this.room
+    if (!room) return
+    const playing = s.phase === 'round' && room.team >= 0 && s.levelId !== null
+    if (playing) {
+      const lv = LEVEL_BY_ID.get(s.levelId!)
+      if (lv && (this.groupRound !== s.round || this.mode !== 'level' || this.level !== lv)) {
+        this.groupRound = s.round
+        this.groupSolved = false
+        this.groupPoints = 0
+        this.groupFeedback = ''
+        this.startLevel(lv)
+      }
+      const me = s.teams[room.team]
+      if (me?.solved && !this.groupSolved) { this.groupSolved = true; this.groupPoints = me.points; this.setMissionButtons() }
+      this.mission.invalidate()
+      return
+    }
+    if (s.phase === 'podium' && this.groupClock !== 'podium') { this.confetti(6, 1.5, -0.6); this.safe('som', () => this.audio.play('win')) }
+    this.groupClock = s.phase
+    this.showGroup()
+  }
+
+  private onJudged(j: Judged): void {
+    if (j.late || j.duplicate) return
+    if (j.ok) {
+      this.groupSolved = true
+      this.groupPoints = j.points ?? 0
+      this.groupFeedback = t('+{n} pontos!', { n: this.groupPoints })
+      if (!this.won) this.win()
+      this.setMissionButtons()
+    } else if (j.wrong) {
+      this.groupFeedback = j.wrong === 1 ? t('1 tentativa errada (−15 pontos no acerto).') : t('{n} tentativas erradas (−{p} pontos no acerto).', { n: j.wrong, p: Math.min(60, j.wrong * 15) })
+    }
+    this.mission.invalidate()
+  }
+
+  /** Shows the group panel for the current state (keypad, team colors, waiting, countdown, results, podium). */
+  private showGroup(): void {
+    this.showPanel('group')
+    this.refreshGroup()
+  }
+
+  private refreshGroup(): void {
+    const P = this.groupPanel
+    const W = P.canvas.width
+    const H = P.canvas.height
+    const b = (id: string, x: number, y: number, w: number, h: number, label: string, onClick: () => void, color?: string, fontPx?: number) =>
+      ({ id, x, y, w, h, label, onClick, color, fontPx })
+    const room = this.room
+    const s = room?.state
+    P.buttons = []
+    if (this.groupView === 'join' || !room) {
+      // Numeric keypad for the 4-digit room code.
+      const kw = 210, kh = 104, gap = 22
+      const x0 = (W - 3 * kw - 2 * gap) / 2
+      const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', 'OK']
+      keys.forEach((k, i) => {
+        const x = x0 + (i % 3) * (kw + gap)
+        const y = 420 + Math.floor(i / 3) * (kh + 18)
+        const ok = k === 'OK'
+        P.buttons.push(b(`key${k}`, x, y, kw, kh, ok ? t('Entrar') : k, () => {
+          if (ok) { if (this.joinCode.length === 4) this.joinRoom(this.joinCode); return }
+          if (k === '⌫') this.joinCode = this.joinCode.slice(0, -1)
+          else if (this.joinCode.length < 4) this.joinCode += k
+          this.joinError = ''
+          this.refreshGroup()
+        }, ok ? (this.joinCode.length === 4 ? MINT : '#5f5a86') : k === '⌫' ? '#c9c4e8' : '#e8e4ff', ok ? 40 : 56))
+      })
+      P.buttons.push(b('back', 60, H - 130, 280, 80, t('Voltar'), () => this.leaveGroup(), '#c9c4e8', 34))
+    } else if (room.team < 0) {
+      // Team (color) choice. Taken colors are greyed out.
+      const cw = (W - 120 - 30) / 2
+      ;(s?.teams ?? TEAM_NAMES.map((name, index) => ({ index, name, claimed: false, online: false } as TeamState))).forEach((tm, i) => {
+        const taken = tm.claimed && tm.online
+        P.buttons.push(b(`team${i}`, 60 + (i % 2) * (cw + 30), 380 + Math.floor(i / 2) * 190, cw, 160,
+          taken ? `${teamName(tm)} · ${t('ocupado')}` : teamName(tm), () => { if (!taken) room.pick(i) }, taken ? '#4a4670' : s?.teams[i]?.color ?? '#8f86c9', 46))
+      })
+      P.buttons.push(b('leave', 60, H - 130, 340, 80, t('Sair do desafio'), () => this.leaveGroup(), '#ff9db5', 34))
+    } else if (!s || s.phase === 'lobby' || s.phase === 'podium') {
+      if (s?.phase !== 'podium') P.buttons.push(b('swap', 60, H - 130, 340, 80, t('Trocar de cor'), () => { room.team = -1; this.refreshGroup() }, '#c9c4e8', 34))
+      P.buttons.push(b('leave', W - 400, H - 130, 340, 80, t('Sair do desafio'), () => this.leaveGroup(), '#ff9db5', 34))
+    }
+    if (this.renderer.xr.isPresenting && (this.groupView === 'join' || !room || room.team < 0 || s?.phase === 'lobby')) {
+      P.buttons.push(b('recenter', W / 2 - 160, H - 130, 320, 80, t('Recentralizar'), () => { this.needAlign = 1 }, '#c9c4e8', 32))
+    }
+    P.invalidate()
+    this.legend.invalidate()
+    this.emitHud()
+  }
+
+  private drawGroup(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    drawLogo(ctx, 60, 50, 110)
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillStyle = '#ffffff'
+    ctx.font = font(76, 'bold')
+    ctx.fillText(t('Desafio em grupo'), 200, 118)
+    const room = this.room
+    const s = room?.state
+    ctx.fillStyle = MINT
+    ctx.font = font(38, 'bold')
+    ctx.fillText(room ? t('Sala {code}', { code: room.room }) : t('Até 4 óculos jogando juntos'), 200, 172)
+    if (room && room.status !== 'open') {
+      ctx.fillStyle = '#ffb347'
+      ctx.font = font(32, 'bold')
+      ctx.textAlign = 'right'
+      ctx.fillText(room.status === 'closed' ? t('Desconectado') : t('Conectando...'), w - 60, 172)
+      ctx.textAlign = 'left'
+    }
+    const center = (text: string, y: number, px: number, color = '#ffffff', weight: 'bold' | 'normal' = 'bold') => {
+      ctx.textAlign = 'center'; ctx.fillStyle = color; fitFont(ctx, text, w - 120, px, weight); ctx.fillText(text, w / 2, y); ctx.textAlign = 'left'
+    }
+    if (this.groupView === 'join' || !room) {
+      center(t('Digite o código da sala que aparece no telão'), 262, 40, '#d8d3f5')
+      const bw = 120, gap = 26
+      const x0 = (w - 4 * bw - 3 * gap) / 2
+      for (let i = 0; i < 4; i++) {
+        roundRect(ctx, x0 + i * (bw + gap), 290, bw, 104, 20)
+        ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fill()
+        ctx.strokeStyle = i === this.joinCode.length ? '#ffd23f' : 'rgba(255,255,255,0.3)'; ctx.lineWidth = 5; ctx.stroke()
+        if (this.joinCode[i]) { ctx.fillStyle = '#ffffff'; ctx.font = font(72, 'bold'); ctx.textAlign = 'center'; ctx.fillText(this.joinCode[i], x0 + i * (bw + gap) + bw / 2, 368); ctx.textAlign = 'left' }
+      }
+      if (this.joinError) center(this.joinError, h - 160, 32, '#ff9db5')
+      return
+    }
+    if (room.team < 0) {
+      center(s ? t('Escolha a cor do seu time') : t('Conectando à sala...'), 300, 52)
+      if (this.joinError) center(this.joinError, h - 160, 32, '#ff9db5')
+      return
+    }
+    const me = s?.teams[room.team]
+    if (!s || !me) return
+    const tier = t(TIER_NAME[s.tier])
+    if (s.phase === 'lobby') {
+      ctx.textAlign = 'center'
+      ctx.fillStyle = me.color
+      fitFont(ctx, t('Seu time: {team}', { team: teamName(me) }), w - 120, 84, 'bold')
+      ctx.fillText(t('Seu time: {team}', { team: teamName(me) }), w / 2, 320)
+      ctx.textAlign = 'left'
+      center(t('Aguardando o professor começar...'), 400, 44, '#ffd23f')
+      center(t('Nível {tier} · {n} desafios', { tier, n: s.totalRounds }), 460, 36, '#d8d3f5', 'normal')
+      this.drawTeamRows(ctx, s, 530, w, false)
+      return
+    }
+    const left = Math.max(0, Math.ceil((s.phaseEndsAt - room.now()) / 1000))
+    if (s.phase === 'countdown') {
+      const lv = s.levelId !== null ? LEVEL_BY_ID.get(s.levelId) : null
+      center(t('Desafio {n} de {total}', { n: s.round + 1, total: s.totalRounds }), 290, 52, '#d8d3f5')
+      if (lv) center(lv.title, 370, 56, MINT)
+      center(String(Math.max(1, left)), 640, 260, '#ffd23f')
+      if (lv) { ctx.fillStyle = '#ffffff'; ctx.font = font(34); ctx.textAlign = 'center'; wrapText(ctx, lv.goal, w / 2, 760, w - 160, 44, 3); ctx.textAlign = 'left' }
+      return
+    }
+    if (s.phase === 'results') {
+      center(t('Fim do desafio {n} de {total}', { n: s.round + 1, total: s.totalRounds }), 286, 52, '#ffffff')
+      center(s.round + 1 < s.totalRounds ? t('Próximo desafio em {n} s', { n: Math.max(1, left) }) : t('Pódio em {n} s', { n: Math.max(1, left) }), 346, 36, '#ffd23f')
+      this.drawTeamRows(ctx, s, 420, w, true)
+      return
+    }
+    // Podium.
+    const order = ranking(s.teams)
+    center(t('Pódio!'), 280, 96, '#ffd23f')
+    const place = order.findIndex(x => x.index === me.index)
+    if (place >= 0) center(place === 0 ? t('Seu time venceu! Parabéns!') : t('Seu time ficou em {n}º lugar.', { n: place + 1 }), 352, 42, me.color)
+    const slots = [1, 0, 2].filter(i => order[i])
+    const bw = 300
+    const base = 900
+    slots.forEach((rankIdx, k) => {
+      const tm = order[rankIdx]
+      const x = w / 2 - (slots.length * bw + (slots.length - 1) * 30) / 2 + k * (bw + 30)
+      const bh = [300, 220, 160][rankIdx]
+      roundRect(ctx, x, base - bh, bw, bh, 18)
+      ctx.fillStyle = tm.color; ctx.fill()
+      ctx.textAlign = 'center'
+      ctx.fillStyle = '#14112e'
+      ctx.font = font(90, 'bold')
+      ctx.fillText(`${rankIdx + 1}º`, x + bw / 2, base - bh + 100)
+      ctx.font = font(34, 'bold')
+      ctx.fillText(t('{n} pts', { n: tm.score }), x + bw / 2, base - 26)
+      ctx.fillStyle = '#ffffff'
+      fitFont(ctx, teamName(tm), bw, 36, 'bold')
+      ctx.fillText(teamName(tm), x + bw / 2, base - bh - 18)
+      ctx.textAlign = 'left'
+    })
+  }
+
+  /** Ranking rows (color dot, team, points, ✓ for this round). */
+  private drawTeamRows(ctx: CanvasRenderingContext2D, s: RoomState, y: number, w: number, round: boolean, rowH = 76, x0 = 120, px = 40): number {
+    const rows = s.phase === 'lobby' ? s.teams.filter(x => x.claimed) : ranking(s.teams)
+    rows.forEach((tm, i) => {
+      const yy = y + i * rowH
+      ctx.beginPath(); ctx.arc(x0, yy - px * 0.32, px * 0.42, 0, Math.PI * 2); ctx.fillStyle = tm.color; ctx.fill()
+      ctx.textAlign = 'left'
+      ctx.fillStyle = tm.online ? '#ffffff' : '#8f89b8'
+      ctx.font = font(px, 'bold')
+      const label = s.phase === 'lobby' ? teamName(tm) : `${i + 1}º  ${teamName(tm)}`
+      ctx.fillText(tm.online ? label : `${label} (${t('sem conexão')})`, x0 + px, yy)
+      if (s.phase !== 'lobby') {
+        ctx.textAlign = 'right'
+        ctx.fillStyle = '#ffd23f'
+        ctx.fillText(t('{n} pts', { n: tm.score }), w - x0 + 40, yy)
+        if (round) {
+          ctx.fillStyle = tm.solved ? MINT : '#ff9db5'
+          ctx.font = font(px * 0.8, 'bold')
+          ctx.fillText(tm.solved ? `✓ +${tm.points} · ${fmtTime(tm.solvedMs)}` : '✗', w - x0 - px * 4.2, yy)
+        }
+        ctx.textAlign = 'left'
+      }
+    })
+    return y + rows.length * rowH
+  }
+
+  /** Sends this headset's molecule poses to the teacher screen (live view), ~8 times per second. */
+  private sendPoses(dt: number): void {
+    const room = this.room
+    if (!room || room.state?.phase !== 'round' || this.mode !== 'level' || room.team < 0) return
+    this.poseTimer -= dt
+    if (this.poseTimer > 0) return
+    this.poseTimer = 0.125
+    const r3 = (x: number) => Math.round(x * 1000) / 1000
+    const mols: PoseMol[] = this.mols.filter(m => !m.disposable).slice(0, 8).map(m => ({
+      id: m.def.id,
+      p: [r3(m.obj.position.x), r3(m.obj.position.y), r3(m.obj.position.z)],
+      q: [r3(m.obj.quaternion.x), r3(m.obj.quaternion.y), r3(m.obj.quaternion.z), r3(m.obj.quaternion.w)],
+      s: m.state === 'docked' ? (m.result?.fit ?? 'docked') : m.state,
+    }))
+    const held = this.mols.find(m => m.state === 'held')?.def.id ?? null
+    room.send({ type: 'pose', held, mols })
+  }
+
+  /** Per-frame: countdown numbers on the group panel and the round clock on the mission panel. */
+  private tickGroup(dt: number): void {
+    const room = this.room
+    const s = room?.state
+    if (!room || !s) return
+    this.sendPoses(dt)
+    const key = s.phase === 'round' ? `r${Math.ceil((s.endsAt - room.now()) / 1000)}` : `${s.phase}${Math.ceil((s.phaseEndsAt - room.now()) / 1000)}`
+    if (key === this.groupClock) return
+    this.groupClock = key
+    if (s.phase === 'round' && this.mode === 'level') this.mission.invalidate()
+    else if (this.groupPanel.mesh.visible) this.groupPanel.invalidate()
   }
 
   private buildMenuDecor(): void {
@@ -458,12 +809,15 @@ export class Game {
     })
   }
 
-  startLevel(index: number): void {
+  /** Starts a stage (a LevelDef, or its id). */
+  startLevel(which: LevelDef | number): void {
+    const level = typeof which === 'number' ? LEVEL_BY_ID.get(which) : which
+    if (!level) throw new Error(`fase desconhecida: ${String(which)}`)
     this.clearLevel()
-    const level = LEVELS[index]
     this.level = level
     this.mode = 'level'
     this.menuGroup.visible = false
+    this.groupPanel.mesh.visible = false
     this.mission.mesh.visible = true
     this.legend.mesh.visible = true
     this.won = false
@@ -471,11 +825,9 @@ export class Game {
     this.heldInfo = null
     this.natTimer = 0
     this.autoNext = 0
-    this.tutStep = 0
-    if (level.kind === 'tutorial') this.natTimer = 1.6
     this.notebook.clear()
     const targets = level.kind === 'lab' ? [this.labTarget] : level.targets
-    targets.forEach((tid, i) => this.addReceptor(tid, targets.length === 1 ? 0 : (i === 0 ? -0.31 : 0.36)))
+    targets.forEach((tid, i) => this.addReceptor(tid, receptorX(i, targets.length)))
     level.tray.forEach((id, i) => this.addTrayMolecule(MOLECULES[id], i, level.tray.length))
     this.setMissionButtons()
     this.mission.invalidate()
@@ -500,12 +852,7 @@ export class Game {
     const model = buildReceptor(def)
     const board = new Panel(0.36, 0.13, 1600, { radius: 30 })
     const rec = new Receptor(def, model, board)
-    if (def.sideTilt) {
-      // Side view: the pocket opens upwards (outside of the cell), tilted towards the player.
-      const t = THREE.MathUtils.degToRad(def.sideTilt)
-      rec.quat.setFromAxisAngle(new V3(1, 0, 0), -t)
-      rec.center.set(x, 1.27, -0.86)
-    } else rec.center.set(x, POCKET_Y, POCKET_Z)
+    placeReceptor(def, x, rec.center, rec.quat)
     rec.normal.set(0, 0, 1).applyQuaternion(rec.quat)
     model.root.position.copy(rec.center)
     model.root.quaternion.copy(rec.quat)
@@ -577,22 +924,22 @@ export class Game {
     if (!level) return
     const btn = (id: string, x: number, y: number, w: number, h: number, label: string, onClick: () => void, color?: string) =>
       ({ id, x, y, w, h, label, onClick, color })
-    const idx = LEVELS.indexOf(level)
-    // Event mode is hands-only and self-running: no "end" button a child could bump by accident.
-    this.mission.buttons = this.run
-      ? [btn('restart', 40, H - 120, 260, 84, t('Recomeçar'), () => this.startLevel(idx), '#c9c4e8')]
+    // Event mode and the group challenge are self-running: no "end" button a child could bump by accident.
+    const restart = () => { const keep = this.groupSolved; this.startLevel(level); this.groupSolved = keep }
+    this.mission.buttons = this.run || this.room
+      ? (this.room && this.groupSolved ? [] : [btn('restart', 40, H - 120, 260, 84, t('Recomeçar'), restart, '#c9c4e8')])
       : [
-        btn('menu', 40, H - 120, 220, 84, t('Menu'), () => this.showMenu(), '#c9c4e8'),
-        btn('restart', 280, H - 120, 260, 84, t('Recomeçar'), () => this.startLevel(idx), '#c9c4e8'),
+        btn('menu', 40, H - 120, 220, 84, t('Menu'), () => this.showMenu('free'), '#c9c4e8'),
+        btn('restart', 280, H - 120, 260, 84, t('Recomeçar'), restart, '#c9c4e8'),
       ]
-    if ((level.kind === 'block' || level.kind === 'tutorial') && !this.won && level.natural) {
+    if ((level.kind === 'block' || level.kind === 'activate') && !this.won && level.natural && !this.room) {
       this.mission.buttons.push(btn('demo', 40, H - 216, W - 80, 80, t('Ver o que faz a molécula natural'), () => { this.natTimer = 0.05 }, '#7fc8ff'))
     }
     if (level.kind === 'lab') {
       const ids: TargetId[] = ['tripsina', 'trombina', 'beta2']
       const bw = (W - 80 - 2 * 16) / 3
       ids.forEach((tid, i) => this.mission.buttons.push(btn(`t-${tid}`, 40 + i * (bw + 16), 250, bw, 76,
-        TARGETS[tid].short, () => { this.labTarget = tid; this.startLevel(idx) }, tid === this.labTarget ? '#ffd23f' : '#8f86c9')))
+        TARGETS[tid].short, () => { this.labTarget = tid; this.startLevel(level) }, tid === this.labTarget ? '#ffd23f' : '#8f86c9')))
     }
     this.mission.invalidate()
   }
@@ -609,9 +956,15 @@ export class Game {
     ctx.fillStyle = MINT
     ctx.font = font(40, 'bold')
     ctx.fillText(t('Como uma molécula encontra seu alvo'), 210, 190)
-    ctx.fillStyle = '#d8d3f5'
-    ctx.font = font(31)
-    wrapText(ctx, t('Muitos remédios funcionam assim: uma molécula se encaixa numa proteína do corpo, como uma chave na fechadura. Pegue as moléculas, teste o encaixe e descubra o que acontece.'), 60, 256, w - 120, 40, 3)
+    if (this.menuPage === 'free') {
+      ctx.fillStyle = '#d8d3f5'
+      ctx.font = font(30)
+      wrapText(ctx, t(TIER_ABOUT[this.freeTier]), 60, 356, w - 120, 36, 1)
+    } else {
+      ctx.fillStyle = '#d8d3f5'
+      ctx.font = font(31)
+      wrapText(ctx, t('Muitos remédios funcionam assim: uma molécula se encaixa numa proteína do corpo, como uma chave na fechadura. Pegue as moléculas, teste o encaixe e descubra o que acontece.'), 60, 256, w - 120, 40, 3)
+    }
     ctx.font = font(24)
     ctx.fillStyle = '#9a93c9'
     ctx.fillText(t('Proteínas reais (banco PDB: tripsina 1BJU, trombina 1PPB, receptor β2 2RH1), com bolsos simplificados.'), 60, h - 84)
@@ -642,7 +995,7 @@ export class Game {
   private simpleLegend(): boolean {
     const isCharge = (c: string) => c === 'pos' || c === 'neg'
     if (this.level) return (this.level.kind === 'lab' ? [this.labTarget] : this.level.targets).every(id => !TARGETS[id].cavities.some(c => isCharge(c.chem)))
-    return this.eventPhases === 1
+    return !!this.event && this.event.tier === 'facil' && this.event.count === 1
   }
 
   private drawLegend(ctx: CanvasRenderingContext2D, w: number, _h: number): void {
@@ -711,43 +1064,88 @@ export class Game {
     ctx.fillStyle = MINT
     fitFont(ctx, level.title, w - 80, 46, 'bold')
     ctx.fillText(level.title, 40, 72)
+    const room = this.room
+    const rs = room?.state
+    const group = !!room && rs?.phase === 'round'
+    let y = 118
+    if (group) {
+      // Round clock and this team's status.
+      const left = Math.max(0, Math.ceil((rs!.endsAt - room!.now()) / 1000))
+      ctx.font = font(34, 'bold')
+      ctx.fillStyle = '#c9c4e8'
+      ctx.fillText(t('Desafio {n} de {total}', { n: rs!.round + 1, total: rs!.totalRounds }), 40, y)
+      ctx.textAlign = 'right'
+      ctx.fillStyle = left <= 10 ? '#ff6b6b' : '#ffd23f'
+      ctx.font = font(44, 'bold')
+      ctx.fillText(`⏱ ${fmtTime(left * 1000)}`, w - 40, y + 4)
+      ctx.textAlign = 'left'
+      y += 52
+    }
     ctx.fillStyle = '#ffffff'
     ctx.font = font(29)
-    let y = 118
-    if (!this.last && !this.heldInfo && !this.won) {
+    if (!this.last && !this.heldInfo && !this.won && !group) {
       y = wrapText(ctx, level.intro, 40, y, w - 80, 37, 4) + 6
     }
     ctx.fillStyle = '#ffd23f'
     ctx.font = font(29, 'bold')
-    y = wrapText(ctx, t('Missão: {goal}', { goal: level.goal }), 40, level.kind === 'lab' ? y : y, w - 80, 37, 3)
+    y = wrapText(ctx, t('Missão: {goal}', { goal: level.goal }), 40, y, w - 80, 37, 3)
     if (level.kind === 'lab') y = Math.max(y, 250) + 96
     y += 8
     ctx.strokeStyle = 'rgba(255,255,255,0.15)'
     ctx.lineWidth = 3
     ctx.beginPath(); ctx.moveTo(40, y - 18); ctx.lineTo(w - 40, y - 18); ctx.stroke()
     y += 18
-    const bottom = h - (this.mission.buttons.some(b => b.id === 'demo') ? 236 : 140)
-    if (level.kind === 'tutorial' && !this.won) {
-      y = this.drawTutorial(ctx, y, w, bottom)
-      if (!this.last || this.tutStep < 3) return
+    let bottom = h - (this.mission.buttons.some(b => b.id === 'demo') ? 236 : this.mission.buttons.length ? 140 : 40)
+    if (group) {
+      // Live ranking at the bottom of the panel.
+      const n = rs!.teams.filter(x => x.claimed).length
+      const top = bottom - n * 46 - 10
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)'
+      ctx.beginPath(); ctx.moveTo(40, top - 6); ctx.lineTo(w - 40, top - 6); ctx.stroke()
+      ranking(rs!.teams).forEach((tm, i) => {
+        const yy = top + 38 + i * 46
+        ctx.beginPath(); ctx.arc(56, yy - 10, 13, 0, Math.PI * 2); ctx.fillStyle = tm.color; ctx.fill()
+        ctx.textAlign = 'left'
+        ctx.fillStyle = tm.index === room!.team ? '#ffffff' : '#c9c4e8'
+        ctx.font = font(28, tm.index === room!.team ? 'bold' : 'normal')
+        ctx.fillText(`${i + 1}º ${teamName(tm)}${tm.solved ? '  ✓' : ''}`, 82, yy)
+        ctx.textAlign = 'right'
+        ctx.fillStyle = '#ffd23f'
+        ctx.font = font(28, 'bold')
+        ctx.fillText(t('{n} pts', { n: tm.score }), w - 40, yy)
+        ctx.textAlign = 'left'
+      })
+      bottom = top - 16
     }
     if (this.won) {
       ctx.fillStyle = MINT
       ctx.font = font(52, 'bold')
-      ctx.fillText(t('Acertou! Muito bem!'), 40, y + 20)
+      ctx.fillText(group && this.groupPoints ? t('Acertou! +{n} pontos', { n: this.groupPoints }) : t('Acertou! Muito bem!'), 40, y + 20)
+      let yy = y + 74
+      if (group) {
+        ctx.fillStyle = '#ffd23f'
+        ctx.font = font(30, 'bold')
+        yy = wrapText(ctx, t('Aguarde os outros times...'), 40, yy, w - 80, 38, 1) + 6
+      }
       ctx.fillStyle = '#ffffff'
       ctx.font = font(29)
-      const yy = wrapText(ctx, level.learned, 40, y + 74, w - 80, 38, Math.floor((bottom - y - 130) / 38))
+      yy = wrapText(ctx, level.learned, 40, yy, w - 80, 38, Math.max(0, Math.floor((bottom - yy - 56) / 38)))
       if (this.autoNext > 0) {
         ctx.fillStyle = '#ffd23f'
         ctx.font = font(34, 'bold')
-        const last = !!this.run && this.run.step >= this.run.phases - 1
+        const last = !!this.run && this.run.step >= this.run.levels.length - 1
         const msg = last ? t('Parabéns em {n} s...', { n: Math.ceil(this.autoNext) }) : t('Próxima fase em {n} s...', { n: Math.ceil(this.autoNext) })
         ctx.fillText(msg, 40, Math.min(bottom - 10, yy + 50))
       }
       return
     }
-    if (this.heldInfo && level.kind !== 'tutorial') {
+    if (group && this.groupFeedback && !this.heldInfo) {
+      ctx.fillStyle = '#ff9db5'
+      ctx.font = font(26, 'bold')
+      ctx.fillText(this.groupFeedback, 40, bottom - 4)
+      bottom -= 40
+    }
+    if (this.heldInfo) {
       ctx.fillStyle = '#c9c4e8'
       ctx.font = font(26, 'bold')
       ctx.fillText(t('NA SUA MÃO'), 40, y)
@@ -756,7 +1154,7 @@ export class Game {
       ctx.fillText(this.heldInfo.name, 40, y + 50)
       ctx.font = font(29)
       ctx.fillStyle = '#d8d3f5'
-      wrapText(ctx, this.heldInfo.about, 40, y + 96, w - 80, 37, 3)
+      wrapText(ctx, this.heldInfo.about, 40, y + 96, w - 80, 37, Math.max(1, Math.min(3, Math.floor((bottom - y - 96) / 37))))
       return
     }
     if (level.kind === 'lab' && this.notebook.size > 0 && !this.last) {
@@ -768,74 +1166,57 @@ export class Game {
       ctx.fillStyle = FIT_COLOR[r.fit]
       ctx.font = font(46, 'bold')
       ctx.fillText(FIT_TITLE[r.fit], 40, y + 18)
+      if (level.tier === 'especialista' && level.kind !== 'selective') {
+        // Docking-score style grade for experts.
+        ctx.textAlign = 'right'
+        ctx.fillStyle = '#ffffff'
+        ctx.font = font(36, 'bold')
+        ctx.fillText(t('Nota {n}/100', { n: Math.round(r.affinity * 100) }), w - 40, y + 18)
+        ctx.textAlign = 'left'
+      }
       ctx.fillStyle = '#c9c4e8'
       ctx.font = font(26)
       ctx.fillText(t('{mol} no {target}', { mol: mol.name, target }), 40, y + 56)
       ctx.fillStyle = '#ffffff'
       ctx.font = font(29)
-      let yy = wrapText(ctx, r.reason, 40, y + 100, w - 80, 37, 3)
+      const lines = (yy: number, lh: number) => Math.max(0, Math.floor((bottom - yy) / lh))
+      let yy = wrapText(ctx, r.reason, 40, y + 100, w - 80, 37, Math.min(3, lines(y + 100, 37)))
       const eff = effectText(r, this.last.enzyme)
-      if (eff) {
+      if (eff && yy < bottom) {
         ctx.fillStyle = r.activates ? '#ffb347' : MINT
         ctx.font = font(29, 'bold')
-        yy = wrapText(ctx, eff, 40, yy + 4, w - 80, 37, 2)
+        yy = wrapText(ctx, eff, 40, yy + 4, w - 80, 37, Math.min(2, lines(yy + 4, 37)))
       }
-      if (extra) {
+      if (extra && yy < bottom) {
         ctx.fillStyle = '#ffd23f'
         ctx.font = font(28, 'bold')
-        yy = wrapText(ctx, extra, 40, yy + 4, w - 80, 36, 3)
+        yy = wrapText(ctx, extra, 40, yy + 4, w - 80, 36, Math.min(3, lines(yy + 4, 36)))
       }
       if (hint && yy < bottom) {
         ctx.fillStyle = '#7fc8ff'
         ctx.font = font(27)
-        wrapText(ctx, hint, 40, yy + 4, w - 80, 35, 2)
+        wrapText(ctx, hint, 40, yy + 4, w - 80, 35, Math.min(2, lines(yy + 4, 35)))
       }
     } else {
       ctx.fillStyle = '#c9c4e8'
       ctx.font = font(29)
-      let yy = wrapText(ctx, t('Pegue uma molécula da bandeja e leve até o bolso da proteína (os três buracos coloridos na superfície).'), 40, y + 10, w - 80, 37, 3)
+      let yy = wrapText(ctx, t('Pegue uma molécula da bandeja e leve até o bolso da proteína (os três buracos coloridos na superfície).'), 40, y + 10, w - 80, 37, Math.min(3, Math.max(0, Math.floor((bottom - y - 10) / 37))))
       if (level.kind === 'lab' && yy < bottom - 120) {
         ctx.fillStyle = '#7fc8ff'
         ctx.font = font(26, 'bold')
         ctx.fillText(t('Sabia que?'), 40, yy + 12)
         ctx.font = font(25)
         wrapText(ctx, t('Estas formas vêm de experimentos reais (banco PDB). Hoje, a inteligência artificial ajuda a planejar fármacos: o AlphaFold prevê a forma 3D das proteínas e ferramentas como o Boltz-2 estimam o quanto uma molécula se liga a elas.'), 40, yy + 48, w - 80, 33, Math.floor((bottom - yy - 48) / 33))
+      } else if (yy < bottom - 80) {
+        ctx.fillStyle = '#7fc8ff'
+        ctx.font = font(26)
+        yy += 8
+        const xr = this.renderer.xr.isPresenting
+        wrapText(ctx, xr
+          ? t('Como pegar: aponte e aperte o gatilho, ou faça pinça com os dedos. Gire o pulso para girar a molécula.')
+          : t('Como pegar: clique na molécula. Roda do mouse ou Q/E giram, botão direito ou F vira.'), 40, yy, w - 80, 34, Math.floor((bottom - yy) / 34))
       }
     }
-  }
-
-  private drawTutorial(ctx: CanvasRenderingContext2D, y: number, w: number, bottom: number): number {
-    const xr = this.renderer.xr.isPresenting
-    const steps = [t('Ver a enzima trabalhar'), t('Pegar uma molécula'), t('Soltar no bolso'), t('Encaixar a Cometa'), t('Testar o bloqueio')]
-    const help = [
-      t('Observe: a "proteína do alimento" chega, encaixa no bolso e a tripsina a corta. Esse é o trabalho normal da enzima.'),
-      xr ? t('Aponte para a Molécula Faísca e aperte o gatilho (ou faça pinça com os dedos) para pegar.') : t('Clique na Molécula Faísca para pegar.'),
-      xr ? t('Leve a molécula até o bolso (os três buracos coloridos) e solte o gatilho.') : t('Leve até o bolso (os três buracos coloridos) e clique para soltar.'),
-      xr ? t('Agora pegue a Cometa. Gire o pulso até a cor de cada ponta combinar com a cor do buraco e solte no bolso.') : t('Agora pegue a Cometa. Gire (roda do mouse, Q/E ou F) até a cor de cada ponta combinar com a do buraco e solte no bolso.'),
-      t('Encaixou! Agora a molécula natural vai tentar entrar no bolso...'),
-    ]
-    ctx.font = font(27, 'bold')
-    steps.forEach((st, i) => {
-      const done = i < this.tutStep
-      const cur = i === this.tutStep
-      ctx.beginPath()
-      ctx.arc(58, y + 2, 15, 0, Math.PI * 2)
-      ctx.fillStyle = done ? MINT : cur ? '#ffd23f' : 'rgba(255,255,255,0.18)'
-      ctx.fill()
-      if (done) {
-        ctx.strokeStyle = '#10102a'; ctx.lineWidth = 5
-        ctx.beginPath(); ctx.moveTo(50, y + 2); ctx.lineTo(56, y + 9); ctx.lineTo(67, y - 5); ctx.stroke()
-      }
-      ctx.fillStyle = done ? '#9ff0d2' : cur ? '#ffffff' : '#8f89b8'
-      ctx.fillText(st, 88, y + 12)
-      y += 44
-    })
-    y += 8
-    ctx.fillStyle = '#ffd23f'
-    ctx.font = font(30, 'bold')
-    y = wrapText(ctx, help[Math.min(this.tutStep, help.length - 1)], 40, y + 14, w - 80, 38, 4)
-    void bottom
-    return y + 30
   }
 
   private drawNotebook(ctx: CanvasRenderingContext2D, y: number, w: number): void {
@@ -919,9 +1300,9 @@ export class Game {
           try { this.advanceRun() } catch (err) { recordError('próxima fase', err); this.showLobby() }
           return
         }
-        const idx = LEVELS.indexOf(this.level!)
-        if (idx >= 0 && idx < LEVELS.length - 1) {
-          try { this.startLevel(idx + 1) } catch (err) { recordError('próxima fase', err); this.showMenu() }
+        const next = this.nextStage()
+        if (next) {
+          try { this.startLevel(next) } catch (err) { recordError('próxima fase', err); this.showMenu() }
         }
       }
     }
@@ -930,6 +1311,7 @@ export class Game {
   update(dt: number): void {
     this.tickAutoNext(dt)
     this.safe('modo evento', () => this.tickEvent())
+    this.safe('desafio em grupo', () => this.tickGroup(dt))
     this.time += dt
     if (this.renderer.xr.isPresenting && this.needAlign > 0) this.alignToHead()
     this.pointers.update()
@@ -965,6 +1347,7 @@ export class Game {
     this.legend.update()
     this.menu.update()
     this.lobby.update()
+    this.groupPanel.update()
     this.emitHud()
   }
 
@@ -984,7 +1367,7 @@ export class Game {
 
   private emitHud(): void {
     const holding = this.pointers.mouse.held instanceof Mol ? (this.pointers.mouse.held as Mol).def.name : null
-    const s: HudState = { holding, xr: this.renderer.xr.isPresenting, mode: this.mode, event: this.eventPhases > 0 }
+    const s: HudState = { holding, xr: this.renderer.xr.isPresenting, mode: this.mode, event: !!this.event, group: !!this.room }
     const key = JSON.stringify(s)
     if (key === this.hudKey) return
     this.hudKey = key
@@ -993,7 +1376,7 @@ export class Game {
 
   private interactables(): THREE.Object3D[] {
     const list: THREE.Object3D[] = []
-    if (this.menuGroup.visible) list.push(this.lobby.mesh.visible ? this.lobby.mesh : this.menu.mesh)
+    if (this.menuGroup.visible) for (const p of [this.menu, this.lobby, this.groupPanel]) if (p.mesh.visible) list.push(p.mesh)
     if (this.mission.mesh.visible) list.push(this.mission.mesh)
     for (const m of this.mols) if (!m.disposable && (m.state === 'tray' || m.state === 'docked')) list.push(m.obj.userData.hit)
     return list
@@ -1035,7 +1418,7 @@ export class Game {
     p.flip = false
     const hit = this.pick(p)
     // Hover visuals.
-    for (const panel of [this.menu, this.lobby, this.mission]) panel.setHover(hit?.panel === panel ? hit.button?.id ?? null : null)
+    for (const panel of [this.menu, this.lobby, this.groupPanel, this.mission]) panel.setHover(hit?.panel === panel ? hit.button?.id ?? null : null)
     for (const m of this.mols) if (m.hover > 0 && m !== hit?.mol) m.hover = 0
     if (hit?.mol) hit.mol.hover = 1
     if (p.line && p.cursor) {
@@ -1100,7 +1483,6 @@ export class Game {
     mol.sticky = false
     p.held = mol
     this.heldInfo = mol.def
-    if (this.level?.kind === 'tutorial' && this.tutStep === 1) this.setTutStep(2)
     this.mission.invalidate()
     this.audio.play('grab')
     p.haptic(0.5, 40)
@@ -1213,9 +1595,10 @@ export class Game {
     let hint = ''
     const auto = level.kind === 'selective'
     if (auto) { r = best; perm = best.perm }
-    else if (rank(best.fit) > rank(r.fit)) {
+    else if (rank(best.fit) > rank(r.fit) && level.tier !== 'especialista') {
       mol.fails++
-      if (mol.fails >= 3) {
+      // "Ajudinha" would hand out answers in a competition, so the group challenge only gives the hint.
+      if (mol.fails >= 3 && !this.room) {
         r = best
         perm = best.perm
         hint = t('Ajudinha: girei a molécula para a melhor posição.')
@@ -1225,11 +1608,21 @@ export class Game {
         : t('Dica: gire ou vire a molécula. Em outra posição ela pode encaixar melhor!')
     }
     if (level.kind === 'lab') this.notebook.set(mol.def.id, bestFit(mol.def, rec.def))
-    if (level.kind === 'tutorial' && this.tutStep <= 2 && r.fit !== 'strong') this.setTutStep(3)
     let extra: string | undefined
+    const bound = r.fit === 'strong' || r.fit === 'weak'
     if (level.kind === 'block' && !mol.def.natural) {
-      if ((r.fit === 'strong' || r.fit === 'weak') && r.activates) extra = t('Encaixou, mas LIGOU o receptor. A missão é BLOQUEAR: tente outra molécula.')
+      if (bound && r.activates) extra = t('Encaixou, mas LIGOU o receptor. A missão é BLOQUEAR: tente outra molécula.')
       else if (r.fit === 'weak') extra = t('Ainda não: encaixe fraco, a molécula logo se solta. Tente outra.')
+    } else if (level.kind === 'activate') {
+      if (bound && !r.activates) extra = t('Encaixou, mas NÃO apertou o interruptor: isso só bloqueia. A missão é LIGAR o receptor.')
+      else if (r.fit === 'weak') extra = t('Ainda não: encaixe fraco, a molécula logo se solta. Tente outra.')
+    } else if (level.kind === 'best' && r.fit === 'strong' && !this.solves(level, r)) {
+      extra = t('Encaixe forte, mas existe uma molécula com nota ainda maior. Continue procurando!')
+    } else if (level.kind === 'best' && r.fit === 'weak') extra = t('Encaixe fraco: procure uma molécula que encaixe forte.')
+    // Group challenge: the room server re-judges the same drop and gives the points.
+    const room = this.room
+    if (room?.state?.phase === 'round' && room.team >= 0 && !this.groupSolved && !mol.def.natural && level.kind !== 'lab') {
+      room.attempt(room.state.round, mol.def.id, perm)
     }
     this.last = { mol: mol.def, target: rec.def.short, r, hint, extra, enzyme: rec.def.switchCavity < 0 }
     if (level.kind === 'selective') {
@@ -1249,13 +1642,13 @@ export class Game {
       const want = level.blockTarget!
       const goal = results.find(x => x.t.def.id === want)!.r
       const others = results.filter(x => x.t.def.id !== want)
-      const bound = (x: FitResult) => x.fit === 'strong' || x.fit === 'weak'
+      const isBound = (x: FitResult) => x.fit === 'strong' || x.fit === 'weak'
       const status = results.map(x => `${x.t.def.name}: ${FIT_TITLE[x.r.fit].toLowerCase()}`).join('. ') + '.'
-      const otherHit = others.some(x => bound(x.r))
+      const otherHit = others.some(x => isBound(x.r))
       let verdict: string
       const ok = goal.fit === 'strong' && !goal.activates && !otherHit
       if (ok) verdict = t('Perfeito: travou a {name} e deixou a outra enzima livre!', { name: TARGETS[want].name.toLowerCase() })
-      else if (bound(goal) && otherHit) verdict = t('Travou as DUAS enzimas: isso causaria efeitos indesejados!')
+      else if (isBound(goal) && otherHit) verdict = t('Travou as DUAS enzimas: isso causaria efeitos indesejados!')
       else if (goal.fit === 'weak') verdict = t('Encaixe fraco: logo se solta. Tente outra molécula.')
       else if (otherHit) verdict = t('Errou o alvo: travou a enzima que devia ficar livre!')
       else verdict = t('Não travou a {name}. Tente outra molécula.', { name: TARGETS[want].name.toLowerCase() })
@@ -1287,10 +1680,9 @@ export class Game {
           this.hapticAll(r.fit === 'strong' ? 0.8 : 0.4, 80)
         })
         const lk = this.level?.kind
-        if (!mol.disposable && (lk === 'block' || lk === 'tutorial') && r.fit === 'strong' && !r.activates && !this.won) {
-          if (lk === 'tutorial') this.setTutStep(4)
-          // Correct answer: celebrate right away; the natural molecule then shows the block as a bonus.
-          this.natTimer = 1.0
+        if (!mol.disposable && !this.won && this.level && this.solves(this.level, r)) {
+          // Correct answer: celebrate right away; for blockers the natural molecule then shows the block as a bonus.
+          if (lk === 'block') this.natTimer = 1.0
           this.win()
         }
         if (!mol.disposable || this.level?.kind === 'selective') {
@@ -1435,7 +1827,7 @@ export class Game {
     }
     // Block-level goal: a non-activating strong binder that turns away natural molecules.
     const occ = r.occupant
-    if ((this.level?.kind === 'block' || this.level?.kind === 'tutorial') && !this.won && occ && !occ.disposable && occ.state === 'docked' && occ.result?.fit === 'strong' && !occ.result.activates && r.blocked >= 1) {
+    if (this.level?.kind === 'block' && !this.won && occ && !occ.disposable && occ.state === 'docked' && occ.result?.fit === 'strong' && !occ.result.activates && r.blocked >= 1) {
       this.win()
     }
   }
@@ -1487,30 +1879,40 @@ export class Game {
             this.fx.burst(this.worldOf(rec.center), 0xffb347, 20, 0.4, 0.025)
           }
           this.eject(mol)
-          if (level.kind === 'tutorial' && this.tutStep === 0) window.setTimeout(() => this.setTutStep(1), 900)
         }, 1500)
       })
     })
   }
 
-  private setTutStep(n: number): void {
-    if (this.level?.kind !== 'tutorial' || n <= this.tutStep) return
-    this.tutStep = n
-    this.audio.play('click')
-    this.mission.invalidate()
+  /** Free play: the next stage of the same difficulty, if any. */
+  private nextStage(): LevelDef | null {
+    const lv = this.level
+    if (!lv || lv.tier === 'lab') return null
+    const list = stagesOf(lv.tier)
+    return list[list.indexOf(lv) + 1] ?? null
+  }
+
+  /** Does this result complete the stage? Same rule as the group-challenge judge (challenges.ts). */
+  private solves(level: LevelDef, r: FitResult): boolean {
+    const strong = r.fit === 'strong'
+    if (level.kind === 'block') return strong && !r.activates
+    if (level.kind === 'activate') return strong && r.activates
+    if (level.kind === 'best') return strong && !r.activates && r.affinity >= bestAffinity(level) - 1e-9
+    return false
   }
 
   private win(): void {
     if (this.won || !this.level) return
     this.won = true
-    const idx = LEVELS.indexOf(this.level)
     if (this.run) {
       this.run.times[this.run.step] = performance.now() - this.run.phaseStart
       this.autoNext = CONFIG.play.autoNextSeconds
-    } else if (idx >= 0 && idx < LEVELS.length - 1) this.autoNext = CONFIG.play.autoNextSeconds
-    this.done.add(this.level.id)
-    track('level_complete', { level: this.level.id, event_mode: !!this.run, xr: this.renderer.xr.isPresenting })
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify([...this.done])) } catch { /* ignore */ }
+    } else if (!this.room && this.nextStage()) this.autoNext = CONFIG.play.autoNextSeconds
+    if (!this.room) {
+      this.done.add(this.level.id)
+      try { localStorage.setItem(SAVE_KEY, JSON.stringify([...this.done])) } catch { /* ignore */ }
+    }
+    track('level_complete', { level: this.level.id, tier: this.level.tier, event_mode: !!this.run, group: !!this.room, xr: this.renderer.xr.isPresenting })
     this.safe('som', () => this.audio.play('win'))
     this.safe('vibração', () => this.hapticAll(1, 200))
     const bp = this.receptors[0]?.board.mesh.position ?? new V3(0, 1.5, -0.7)

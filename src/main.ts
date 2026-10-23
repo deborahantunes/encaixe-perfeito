@@ -7,7 +7,8 @@ import { loadProteins } from './game/models'
 import { localizeData } from './game/localize'
 import { LANGS, lang, setLang, t } from './i18n'
 import { initAnalytics, track } from './core/analytics'
-import { readEventSetting, saveEventSetting, type EventPhases } from './game/event'
+import { lastEventSetting, readEventSetting, type EventSetting } from './game/event'
+import { TIERS, TIER_NAME, stagesOf, type Tier } from './game/data'
 import { APP_VERSION, clearError, installGlobalErrorLog, lastError } from './core/errlog'
 /** Set by boot(): true when reloading would not interrupt anyone (not in VR, not mid-level). */
 let canReload = (): boolean => true
@@ -45,6 +46,7 @@ async function boot(): Promise<void> {
   installGlobalErrorLog()
   localizeData()
   initAnalytics(lang)
+  const initialEvent = readEventSetting()
   document.documentElement.lang = lang === 'pt' ? 'pt-BR' : lang
   const canvas = document.querySelector<HTMLCanvasElement>('#game')!
   const ui = document.getElementById('ui')!
@@ -61,9 +63,16 @@ async function boot(): Promise<void> {
         </div>
         <div class="evento" role="group" aria-label="${t('Modo evento (fila de visitantes)')}">
           <span>${t('Modo evento (fila de visitantes)')}</span>
-          ${([[0, t('Desligado')], [1, t('1 fase')], [2, t('2 fases')], [3, t('3 fases')]] as [EventPhases, string][])
-            .map(([n, label]) => `<button class="lang${n === readEventSetting() ? ' on' : ''}" data-evento="${n}">${label}</button>`).join('')}
+          ${([['off', t('Desligado')], ...TIERS.map(x => [x, t(TIER_NAME[x])])] as [string, string][])
+            .map(([v, label]) => `<button class="lang${v === (initialEvent?.tier ?? 'off') ? ' on' : ''}" data-evento="${v}">${label}</button>`).join('')}
         </div>
+        <form class="evento sala" data-form="sala">
+          <span>${t('Desafio em grupo: código da sala')}</span>
+          <input name="sala" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="0000" aria-label="${t('Código da sala')}">
+          <button class="lang" type="submit">${t('Entrar na sala')}</button>
+          <a class="lang" href="placar.html">${t('Tela do professor')}</a>
+          <small class="sala-ok" hidden></small>
+        </form>
         <div class="progress"><i></i></div>
         <p class="offline" hidden></p>
         <p class="note">${t('No <b>Meta Quest 3</b>: abra este endereço no navegador do óculos e toque em <b>Entrar na Realidade Virtual</b>. Funciona com os controles ou só com as mãos (pinça com os dedos).')}</p>
@@ -85,13 +94,26 @@ async function boot(): Promise<void> {
     if (lng && lng !== lang) { setLang(lng as typeof lang); location.reload() }
     const ev = (e.target as HTMLElement).closest<HTMLElement>('[data-evento]')?.dataset.evento
     if (ev !== undefined) {
-      const n = Number(ev) as EventPhases
-      saveEventSetting(n)
+      const last = lastEventSetting()
+      const tier = ev as Tier
+      const next: EventSetting | null = ev === 'off' ? null : { tier, count: last.tier === tier ? last.count : stagesOf(tier).length }
       ui.querySelectorAll<HTMLElement>('[data-evento]').forEach(b => b.classList.toggle('on', b.dataset.evento === ev))
-      applyEvent(n)
+      applyEvent(next)
     }
   })
-  let applyEvent: (n: EventPhases) => void = () => {}
+  ui.addEventListener('submit', e => {
+    e.preventDefault()
+    const input = (e.target as HTMLFormElement).querySelector('input')!
+    const code = input.value.replace(/\D/g, '').slice(0, 4)
+    if (code.length !== 4) { input.focus(); return }
+    applyRoom(code)
+    const ok = ui.querySelector<HTMLElement>('.sala-ok')!
+    ok.hidden = false
+    ok.textContent = t('Sala {code}: agora toque em Entrar na Realidade Virtual.', { code })
+    ui.querySelectorAll<HTMLElement>('[data-evento]').forEach(b => b.classList.toggle('on', b.dataset.evento === 'off'))
+  })
+  let applyEvent: (s: EventSetting | null) => void = () => {}
+  let applyRoom: (code: string) => void = () => {}
   setupOffline($('.offline'))
   const bar = $('.progress i')
   bar.style.width = '10%'
@@ -119,8 +141,19 @@ async function boot(): Promise<void> {
   const audio = new Audio()
   const pointers = new Pointers(renderer, scene, camera, canvas)
   const game = new Game(scene, camera, renderer, pointers, audio)
-  game.setEventPhases(readEventSetting())
-  applyEvent = n => game.setEventPhases(n)
+  game.setEvent(initialEvent)
+  applyEvent = s => game.setEvent(s)
+  applyRoom = code => game.openJoin(code)
+  // ?sala=1234 (link shown on the teacher screen), or a page reload in the middle of a group challenge.
+  let roomCode = ''
+  try { roomCode = new URLSearchParams(location.search).get('sala') ?? sessionStorage.getItem('encaixe-sala-atual') ?? '' } catch { /* ignore */ }
+  if (/^\d{4}$/.test(roomCode)) {
+    game.openJoin(roomCode)
+    const ok = ui.querySelector<HTMLElement>('.sala-ok')!
+    ok.hidden = false
+    ok.textContent = t('Sala {code}: agora toque em Entrar na Realidade Virtual.', { code: roomCode })
+    ui.querySelector<HTMLInputElement>('[name="sala"]')!.value = roomCode
+  }
   canReload = () => !renderer.xr.isPresenting && (!ui.querySelector('.start')?.classList.contains('is-hidden') || game.mode === 'menu')
   const le = lastError()
   if (le) {
@@ -140,7 +173,7 @@ async function boot(): Promise<void> {
     tools.forEach(el => { el.hidden = !s.holding })
     tip.textContent = s.holding
       ? t('{name}: gire e clique no bolso da proteína', { name: s.holding })
-      : s.mode === 'menu' ? (s.event ? t('Clique em COMEÇAR no painel') : t('Escolha uma fase no painel')) : t('Clique numa molécula para pegar')
+      : s.mode === 'menu' ? (s.group ? t('Desafio em grupo: siga o painel') : s.event ? t('Clique em COMEÇAR no painel') : t('Escolha um modo no painel')) : t('Clique numa molécula para pegar')
   }
 
   const xr = navigator.xr
@@ -164,10 +197,10 @@ async function boot(): Promise<void> {
         session = null
         start.classList.add('is-hidden')
         vr2.hidden = !vrOk
-        game.onHud({ holding: null, xr: false, mode: game.mode, event: game.eventPhases > 0 })
+        game.onHud({ holding: null, xr: false, mode: game.mode, event: !!game.event, group: !!game.room })
       })
       await renderer.xr.setSession(s)
-      track('play_start', { mode: mode === 'immersive-ar' ? 'mixed_reality' : 'vr', event_phases: game.eventPhases })
+      track('play_start', { mode: mode === 'immersive-ar' ? 'mixed_reality' : 'vr', event_phases: game.event?.count ?? 0, tier: game.event?.tier ?? '', group: !!game.room })
       start.classList.add('is-hidden')
       vr2.hidden = true
     } catch (err) {
@@ -177,10 +210,10 @@ async function boot(): Promise<void> {
   }
   const flat = () => {
     audio.unlock()
-    track('play_start', { mode: 'browser', event_phases: game.eventPhases })
+    track('play_start', { mode: 'browser', event_phases: game.event?.count ?? 0, tier: game.event?.tier ?? '', group: !!game.room })
     start.classList.add('is-hidden')
     vr2.hidden = !vrOk
-    game.onHud({ holding: null, xr: false, mode: game.mode, event: game.eventPhases > 0 })
+    game.onHud({ holding: null, xr: false, mode: game.mode, event: !!game.event, group: !!game.room })
   }
   ui.addEventListener('click', e => {
     const act = (e.target as HTMLElement).closest<HTMLElement>('[data-act]')?.dataset.act
