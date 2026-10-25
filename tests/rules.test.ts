@@ -39,8 +39,8 @@ describe('encaixe didático', () => {
     expect(strong.some(p => PERMS.slice(0, 3).includes(p))).toBe(true)
     expect(strong.some(p => PERMS.slice(3).includes(p))).toBe(true)
   })
-  it('fácil fase 2: β2 sem cargas; Raio LIGA, Escudo bloqueia', () => {
-    const lv = LEVEL_BY_ID.get(2)!
+  it('fácil fase 3: β2 sem cargas; Raio LIGA, Escudo bloqueia', () => {
+    const lv = LEVEL_BY_ID.get(3)!
     expect(lv.targets).toEqual(['beta2_facil'])
     expect(best('raio_f', 'beta2_facil')).toMatchObject({ fit: 'strong', activates: true })
     expect(best('mensageiro_f', 'beta2_facil')).toMatchObject({ fit: 'strong', activates: true })
@@ -48,7 +48,7 @@ describe('encaixe didático', () => {
     expect(ok).toEqual(['escudo_f'])
   })
   it('nível fácil: a molécula certa encaixa só GIRANDO (de qualquer lado, sem virar)', () => {
-    for (const [lv, m] of [[1, 'folha'], [2, 'escudo_f'], [3, 'laco']] as const) {
+    for (const [lv, m] of [[1, 'folha'], [2, 'laco'], [3, 'escudo_f']] as const) {
       const level = LEVEL_BY_ID.get(lv)!
       expect(level.turnOnly, level.title).toBe(true)
       const t = TARGETS[level.targets[0]]
@@ -94,9 +94,9 @@ describe('encaixe didático', () => {
   })
   it('cada fase tem exatamente UMA molécula certa', () => {
     const sol = (id: number) => { const l = LEVEL_BY_ID.get(id)!; return l.tray.filter(m => permsFor(armsOf(l)).some(p => judge(l, m, p).ok)) }
-    expect(stagesOf('facil').map(l => sol(l.id))).toEqual([['folha'], ['escudo_f'], ['laco']])
-    expect(stagesOf('padrao').map(l => sol(l.id))).toEqual([['cometa'], ['escudo'], ['trevo']])
-    expect(stagesOf('especialista').map(l => sol(l.id))).toEqual([['estrela'], ['coroa'], ['polvo']])
+    expect(stagesOf('facil').map(l => sol(l.id))).toEqual([['folha'], ['laco'], ['escudo_f']])
+    expect(stagesOf('padrao').map(l => sol(l.id))).toEqual([['cometa'], ['trevo'], ['escudo']])
+    expect(stagesOf('especialista').map(l => sol(l.id))).toEqual([['estrela'], ['polvo'], ['coroa']])
   })
   it('níveis padrão e especialista: a molécula certa precisa da orientação certa (girar E virar)', () => {
     for (const tier of ['padrao', 'especialista'] as const) for (const l of stagesOf(tier)) {
@@ -129,7 +129,7 @@ describe('encaixe didático', () => {
   it('especialista: várias moléculas encaixam forte (a ordem e o tamanho das pontas decidem)', () => {
     const strong = (l: number, tg: TargetId) => LEVEL_BY_ID.get(l)!.tray.filter(m => best(m, tg).fit === 'strong')
     expect(strong(21, 'tripsina_exp').length).toBeGreaterThanOrEqual(3)
-    expect(strong(22, 'beta2_exp').length).toBeGreaterThanOrEqual(3)
+    expect(strong(23, 'beta2_exp').length).toBeGreaterThanOrEqual(3)
     // Same arms as the answer, other order around the ring: never strong.
     expect(best('tranca', 'tripsina_exp').fit).not.toBe('strong')
     expect(best('leque', 'beta2_exp').fit).not.toBe('strong')

@@ -47,18 +47,18 @@ for (const seq of keys) {
 if (fit !== 'strong') fail(`never reached a strong fit, last ${fit}`)
 
 // Every stage of every difficulty: the right molecule wins (blockers also turn away the natural molecule).
-const stages = [[1, 'folha'], [2, 'escudo_f'], [3, 'laco'], [11, 'cometa'], [12, 'escudo'], [13, 'trevo', 1],
-  [21, 'estrela'], [22, 'coroa'], [23, 'polvo', 1]].map(([id, sol, target = 0]) => ({ id, sol, target }))
+const stages = [[1, 'folha'], [2, 'laco'], [3, 'escudo_f'], [11, 'cometa'], [12, 'trevo', 1], [13, 'escudo'],
+  [21, 'estrela'], [22, 'polvo', 1], [23, 'coroa']].map(([id, sol, target = 0]) => ({ id, sol, target }))
 for (const { id, sol, target } of stages) {
   await page.evaluate(([id, sol, target]) => { const g = window.__game.game; g.startLevel(id); g.debugDock(sol, target) }, [id, sol, target])
   await page.waitForFunction(() => window.__game.game.isWon, null, { timeout: 30000 }).catch(() => fail(`stage ${id} not won with ${sol}`))
 }
 // Wrong drug must not win the selective stage.
-await page.evaluate(() => { const g = window.__game.game; g.startLevel(13); g.debugDock('cometa', 1) })
+await page.evaluate(() => { const g = window.__game.game; g.startLevel(12); g.debugDock('cometa', 1) })
 await page.waitForTimeout(6000)
-if (await page.evaluate(() => window.__game.game.isWon)) fail('non-selective Cometa should not win stage 13')
+if (await page.evaluate(() => window.__game.game.isWon)) fail('non-selective Cometa should not win stage 12')
 // Expert: a strong but lower-scoring molecule must not win; nor an agonist in the 5-point receptor.
-for (const [id, mol] of [[21, 'cruz'], [22, 'farol']]) {
+for (const [id, mol] of [[21, 'cruz'], [23, 'farol']]) {
   await page.evaluate(([id, mol]) => { const g = window.__game.game; g.startLevel(id); g.debugDock(mol) }, [id, mol])
   await page.waitForTimeout(3000)
   if (await page.evaluate(() => window.__game.game.isWon)) fail(`${mol} should not win stage ${id}`)

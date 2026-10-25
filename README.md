@@ -36,9 +36,9 @@ The main menu has three modes:
 
 | Difficulty | Stages | Idea |
 | --- | --- | --- |
-| **Fácil** (easy, children) | 1 A chave certa · 2 Ligar ou bloquear? · 3 Trave a trombina | Only shape + oil/water (no charges at all); turning is enough (turn-only docking) |
-| **Padrão** (standard) | 1 Trave a tripsina · 2 Bloqueie o receptor · 3 A molécula que escolhe | +/− charges, agonist vs antagonist, selectivity; turn **and** flip |
-| **Especialista** (expert) | 1 Quatro sub-bolsos · 2 Cinco pontos no receptor · 3 Seletividade nos sub-bolsos | Pockets with 4 (protease sub-sites S1–S4) and 5 (β2 receptor) contact points, 4- and 5-arm molecules, look-alike decoys (same arms in another order), a 0–100 fit score, no help |
+| **Fácil** (easy, children) | 1 A chave certa · 2 Trave a trombina · 3 Ligar ou bloquear? | Only shape + oil/water (no charges at all); turning is enough (turn-only docking) |
+| **Padrão** (standard) | 1 Trave a tripsina · 2 A molécula que escolhe · 3 Bloqueie o receptor | +/− charges, agonist vs antagonist, selectivity; turn **and** flip |
+| **Especialista** (expert) | 1 Quatro sub-bolsos · 2 Seletividade nos sub-bolsos · 3 Cinco pontos no receptor | Pockets with 4 (protease sub-sites S1–S4) and 5 (β2 receptor) contact points, 4- and 5-arm molecules, look-alike decoys (same arms in another order), a 0–100 fit score, no help |
 
 Each difficulty has 3 stages and every stage has exactly one correct molecule (checked by `tests/rules.test.ts`).
 The easy stages use uncharged versions of the real trypsin (PDB 1BJU), β2 receptor (PDB 2RH1) and thrombin (PDB 1PPB)

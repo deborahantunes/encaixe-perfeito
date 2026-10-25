@@ -334,18 +334,18 @@ export const LEVELS: LevelDef[] = [
     learned: 'Para encaixar, a molécula precisa ter o TAMANHO e a QUÍMICA certos para o bolso: parte oleosa no buraco oleoso e parte que gosta de água no buraco que gosta de água. A Folha encaixou direitinho e travou a enzima!',
   },
   {
-    id: 2, tier: 'facil', kind: 'block', title: 'Fase 2 · Ligar ou bloquear?', seconds: 90,
-    intro: 'O receptor β2 atravessa a membrana da célula. O bolso fica do lado de FORA. Quando o mensageiro natural encaixa e aperta o "interruptor" (anel tracejado), um recado passa para DENTRO da célula.',
-    goal: 'Encontre a molécula que ocupa o receptor SEM apertar o interruptor, para o recado parar.',
-    targets: ['beta2_facil'], tray: ['gota', 'raio_f', 'folha', 'grao', 'escudo_f'], natural: 'mensageiro_f', turnOnly: true,
-    learned: 'Moléculas que encaixam e LIGAM o receptor se chamam agonistas (a Raio). As que encaixam e só BLOQUEIAM se chamam antagonistas (a Escudo). As duas encaixam, mas fazem coisas opostas! A Escudo tem a ponta que gosta de água curtinha demais: não alcança o interruptor.',
-  },
-  {
-    id: 3, tier: 'facil', kind: 'block', title: 'Fase 3 · Trave a trombina', seconds: 90,
+    id: 2, tier: 'facil', kind: 'block', title: 'Fase 2 · Trave a trombina', seconds: 90,
     intro: 'A trombina é a enzima que ajuda o sangue a coagular: ela corta o fibrinogênio. O bolso dela tem DOIS buracos oleosos.',
     goal: 'Encontre a molécula que trava a trombina.',
     targets: ['trombina_facil'], tray: ['gota', 'folha', 'laco', 'gigante', 'grao'], natural: 'fibrinogenio', turnOnly: true,
     learned: 'Cada proteína tem um bolso diferente. A Laço tem duas partes oleosas, do tamanho certo para os dois buracos oleosos da trombina. A Folha só tem uma: encaixou fraco.',
+  },
+  {
+    id: 3, tier: 'facil', kind: 'block', title: 'Fase 3 · Ligar ou bloquear?', seconds: 90,
+    intro: 'O receptor β2 atravessa a membrana da célula. O bolso fica do lado de FORA. Quando o mensageiro natural encaixa e aperta o "interruptor" (anel tracejado), um recado passa para DENTRO da célula.',
+    goal: 'Encontre a molécula que ocupa o receptor SEM apertar o interruptor, para o recado parar.',
+    targets: ['beta2_facil'], tray: ['gota', 'raio_f', 'folha', 'grao', 'escudo_f'], natural: 'mensageiro_f', turnOnly: true,
+    learned: 'Moléculas que encaixam e LIGAM o receptor se chamam agonistas (a Raio). As que encaixam e só BLOQUEIAM se chamam antagonistas (a Escudo). As duas encaixam, mas fazem coisas opostas! A Escudo tem a ponta que gosta de água curtinha demais: não alcança o interruptor.',
   },
   // ------------------------------------------------------------------ Padrão
   {
@@ -356,18 +356,18 @@ export const LEVELS: LevelDef[] = [
     learned: 'A Cometa tem ponta positiva para a âncora negativa, parte oleosa grande e uma pontinha que gosta de água. Muitos remédios travam enzimas assim: ocupam o bolso e a molécula natural não entra.',
   },
   {
-    id: 12, tier: 'padrao', kind: 'block', title: 'Fase 2 · Bloqueie o receptor', seconds: 90,
-    intro: 'O receptor β2 manda um recado para dentro da célula quando o interruptor (anel tracejado) é apertado.',
-    goal: 'Ocupe o receptor β2 SEM apertar o interruptor.',
-    targets: ['beta2'], tray: ['raio', 'gota', 'escudo', 'cometa', 'pluma'], natural: 'mensageiro',
-    learned: 'A Escudo encaixa, mas a ponta que gosta de água é curta demais para apertar o interruptor: é um antagonista (bloqueador).',
-  },
-  {
-    id: 13, tier: 'padrao', kind: 'selective', title: 'Fase 3 · A molécula que escolhe', seconds: 100,
+    id: 12, tier: 'padrao', kind: 'selective', title: 'Fase 2 · A molécula que escolhe', seconds: 100,
     intro: 'Trombina e tripsina são enzimas "primas": os bolsos são parecidos. Queremos travar a trombina (coagulação) sem atrapalhar a tripsina (digestão).',
     goal: 'Trave a TROMBINA e deixe a TRIPSINA livre. A molécula testa as duas ao mesmo tempo.',
     targets: ['tripsina', 'trombina'], tray: ['faisca', 'cometa', 'gigante', 'trevo'], blockTarget: 'trombina',
     learned: 'Moléculas SELETIVAS encaixam bem só no alvo certo. A Trevo tem uma parte média oleosa que cabe no bolsinho da trombina, mas é grande demais para o da tripsina. Menos efeitos indesejados!',
+  },
+  {
+    id: 13, tier: 'padrao', kind: 'block', title: 'Fase 3 · Bloqueie o receptor', seconds: 90,
+    intro: 'O receptor β2 manda um recado para dentro da célula quando o interruptor (anel tracejado) é apertado.',
+    goal: 'Ocupe o receptor β2 SEM apertar o interruptor.',
+    targets: ['beta2'], tray: ['raio', 'gota', 'escudo', 'cometa', 'pluma'], natural: 'mensageiro',
+    learned: 'A Escudo encaixa, mas a ponta que gosta de água é curta demais para apertar o interruptor: é um antagonista (bloqueador).',
   },
   // ------------------------------------------------------------------ Especialista (4 and 5 contact points)
   {
@@ -378,18 +378,18 @@ export const LEVELS: LevelDef[] = [
     learned: 'Cruz e Hélice encaixam forte, mas sobra espaço em um sub-bolso (nota 95). A Trança tem as mesmas pontas da Estrela em outra ordem: a ORDEM ao redor do anel importa. Só a Estrela preenche os quatro sub-bolsos com tamanho e química exatos (nota 100).',
   },
   {
-    id: 22, tier: 'especialista', kind: 'block', title: 'Fase 2 · Cinco pontos no receptor', seconds: 150,
-    intro: 'O bolso do receptor β2 tem CINCO pontos de contato: a âncora negativa (Asp113), um grupo oleoso grande, o interruptor (serinas da hélice 5), um ponto oleoso médio e um pequeno que gosta de água. Três moléculas encaixam forte. Só uma bloqueia.',
-    goal: 'Ocupe os cinco pontos do β2 SEM apertar o interruptor.',
-    targets: ['beta2_exp'], tray: ['farol', 'leque', 'coroa', 'martelo', 'flor', 'sombra'],
-    learned: 'Farol e Flor encaixam e apertam o interruptor: agonistas. A Coroa encaixa nos cinco pontos, mas a ponta do meio é pequena demais para o interruptor: antagonista. Uma única ponta decide entre ligar e bloquear.',
-  },
-  {
-    id: 23, tier: 'especialista', kind: 'selective', title: 'Fase 3 · Seletividade nos sub-bolsos', seconds: 150,
+    id: 22, tier: 'especialista', kind: 'selective', title: 'Fase 2 · Seletividade nos sub-bolsos', seconds: 150,
     intro: 'Tripsina e trombina têm os mesmos sub-bolsos S1 e S3. A diferença está no S2 (pequeno na trombina) e no S4 (grande e oleoso na trombina). A molécula testa as duas enzimas ao mesmo tempo.',
     goal: 'Trave a TROMBINA e deixe a TRIPSINA totalmente livre.',
     targets: ['tripsina_exp', 'trombina_exp'], tray: ['estrela', 'ponte', 'tranca', 'polvo', 'garra', 'cruz'], blockTarget: 'trombina_exp',
     learned: 'A Ponte gruda nas duas enzimas. Estrela e Cruz não cabem no S2 pequeno da trombina. A Polvo tem a ponta oleosa pequena para o S2 e a GRANDE para o S4 da trombina, que não cabe no S4 da tripsina: é seletiva. Anticoagulantes seletivos de verdade exploram diferenças como essas.',
+  },
+  {
+    id: 23, tier: 'especialista', kind: 'block', title: 'Fase 3 · Cinco pontos no receptor', seconds: 150,
+    intro: 'O bolso do receptor β2 tem CINCO pontos de contato: a âncora negativa (Asp113), um grupo oleoso grande, o interruptor (serinas da hélice 5), um ponto oleoso médio e um pequeno que gosta de água. Três moléculas encaixam forte. Só uma bloqueia.',
+    goal: 'Ocupe os cinco pontos do β2 SEM apertar o interruptor.',
+    targets: ['beta2_exp'], tray: ['farol', 'leque', 'coroa', 'martelo', 'flor', 'sombra'],
+    learned: 'Farol e Flor encaixam e apertam o interruptor: agonistas. A Coroa encaixa nos cinco pontos, mas a ponta do meio é pequena demais para o interruptor: antagonista. Uma única ponta decide entre ligar e bloquear.',
   },
   // ------------------------------------------------------------------ free lab bench
   {

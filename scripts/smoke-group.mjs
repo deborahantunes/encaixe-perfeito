@@ -72,17 +72,18 @@ await placar.waitForFunction(() => {
 }, null, { timeout: 30000 }).catch(() => fail('live view did not show the docked molecule'))
 await placar.screenshot({ path: `${shots}/placar-3-rodada.png` })
 await players[0].screenshot({ path: `${shots}/oculos-3-rodada.png` })
-await players[1].waitForFunction(() => window.__game.game.mols.find(m => m.def.id === 'gota')?.state === 'tray', null, { timeout: 8000 })
+// Wait until the room server has counted the miss (the molecule animation speed depends on the machine).
+await players[1].waitForFunction(() => window.__game.game.room.state.teams[1].wrong === 1, null, { timeout: 30000 })
 await players[1].evaluate(() => window.__game.game.debugDock('cometa'))
 await placar.waitForSelector('.results', { timeout: 30000 })
 await placar.screenshot({ path: `${shots}/placar-4-resultado.png` })
 await players[1].waitForTimeout(300)
 await players[1].screenshot({ path: `${shots}/oculos-4-resultado.png` })
 
-// Round 2 (Bloqueie o receptor): only headset 1 solves; the teacher ends the round.
+// Round 2 (A molécula que escolhe): only headset 1 solves; the teacher ends the round.
 for (const p of players) await p.waitForFunction(() => window.__game.game.mode === 'level' && window.__game.game.level?.id === 12, null, { timeout: 10000 })
-await players[1].evaluate(() => window.__game.game.debugDock('escudo'))
-await players[1].waitForFunction(() => window.__game.game.isWon, null, { timeout: 8000 })
+await players[1].evaluate(() => window.__game.game.debugDock('trevo', 1))
+await players[1].waitForFunction(() => window.__game.game.isWon, null, { timeout: 30000 })
 await placar.waitForTimeout(600)
 await placar.click('[data-act="next"]')
 await placar.waitForSelector('.podium', { timeout: 10000 })
