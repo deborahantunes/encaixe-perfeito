@@ -15,17 +15,22 @@ export type Cavity = { size: 1 | 2 | 3; chem: Chem }
 export type MoleculeId =
   | 'substrato' | 'mensageiro'
   | 'cometa' | 'trevo' | 'escudo' | 'raio' | 'gota' | 'gigante' | 'faisca' | 'pluma'
-  | 'alimento' | 'folha' | 'grao' | 'nuvem' | 'raio2'
-  | 'fibrinogenio' | 'laco' | 'seta'
+  | 'alimento' | 'folha' | 'grao' | 'nuvem'
+  | 'fibrinogenio' | 'laco' | 'mensageiro_f' | 'raio_f' | 'escudo_f'
+  // Expert stages: 4 arms (protease sub-pockets S1-S4) and 5 arms (β2 receptor contact points).
+  | 'estrela' | 'cruz' | 'helice' | 'tranca' | 'garra' | 'polvo' | 'ponte'
+  | 'farol' | 'coroa' | 'flor' | 'leque' | 'martelo' | 'sombra'
 
-export type TargetId = 'tripsina' | 'tripsina_facil' | 'trombina' | 'trombina_facil' | 'beta2'
+export type TargetId = 'tripsina' | 'tripsina_facil' | 'trombina' | 'trombina_facil' | 'beta2' | 'beta2_facil'
+  | 'tripsina_exp' | 'trombina_exp' | 'beta2_exp'
 
 export type MoleculeDef = {
   id: MoleculeId
   name: string
   /** Short, everyday description. */
   about: string
-  groups: [Group, Group, Group]
+  /** 3 arms (classic), 4 or 5 (expert stages); the pocket of the target must have the same number of wells. */
+  groups: Group[]
   /** Core ring tint (identity color, no chemical meaning). */
   tint: number
   /** Molecule made by the body itself (arrives on its own during block levels). */
@@ -42,7 +47,7 @@ export type TargetDef = {
   pdb: string
   /** What the protein does in the body. */
   role: string
-  cavities: [Cavity, Cavity, Cavity]
+  cavities: Cavity[]
   /** Charged "anchor" cavity: needs the opposite charge, otherwise the molecule slips out (-1 = no anchor). */
   anchor: number
   /** Receptor on/off switch: touching it exactly (size + chemistry) activates the protein. -1 for enzymes. */
@@ -89,13 +94,6 @@ export const MOLECULES: Record<MoleculeId, MoleculeDef> = {
     id: 'raio', name: 'Molécula Raio', tint: 0xfff3a0,
     about: 'Molécula inventada parecida com o mensageiro natural, mas com uma parte oleosa maior.',
     groups: [g(1, 'pos'), g(3, 'oil'), g(2, 'polar')],
-  },
-  // Stage 2 version of Raio: NEGATIVE tip (red), so children tell it apart from Escudo at a glance
-  // (it is pushed away by the receptor's negative anchor). The original Raio stays in the lab and challenges.
-  raio2: {
-    id: 'raio2', name: 'Molécula Raio', tint: 0xfff3a0,
-    about: 'Molécula inventada parecida com a Escudo, mas com a ponta NEGATIVA (−).',
-    groups: [g(1, 'neg'), g(3, 'oil'), g(2, 'polar')],
   },
   gota: {
     id: 'gota', name: 'Molécula Gota', tint: 0xc8f7ff,
@@ -144,11 +142,88 @@ export const MOLECULES: Record<MoleculeId, MoleculeDef> = {
     about: 'Molécula inventada com DUAS partes oleosas (uma grande e uma média) e uma parte que gosta de água.',
     groups: [g(2, 'polar'), g(3, 'oil'), g(2, 'oil')],
   },
-  // Expert decoy: binds strongly to both enzymes, but never as well as the best answer.
-  seta: {
-    id: 'seta', name: 'Molécula Seta', tint: 0xd7f0a8,
-    about: 'Molécula inventada: ponta positiva, parte oleosa grande e uma pontinha oleosa.',
-    groups: [g(2, 'pos'), g(3, 'oil'), g(1, 'oil')],
+  // Easy Stage 2 (β2 receptor without charges): only size and oil/water decide.
+  mensageiro_f: {
+    id: 'mensageiro_f', name: 'Mensageiro natural', natural: true, tint: 0xffc2d6,
+    about: 'Molécula que o próprio corpo fabrica para "ligar" o receptor e mandar um recado para a célula.',
+    groups: [g(1, 'polar'), g(2, 'oil'), g(2, 'polar')],
+  },
+  raio_f: {
+    id: 'raio_f', name: 'Molécula Raio', tint: 0xfff3a0,
+    about: 'Molécula inventada parecida com o mensageiro natural, mas com uma parte oleosa maior.',
+    groups: [g(1, 'polar'), g(3, 'oil'), g(2, 'polar')],
+  },
+  escudo_f: {
+    id: 'escudo_f', name: 'Molécula Escudo', tint: 0xa8d8ff,
+    about: 'Molécula inventada parecida com a Raio, mas com a ponta que gosta de água bem curtinha.',
+    groups: [g(1, 'polar'), g(3, 'oil'), g(1, 'polar')],
+  },
+  // Expert, 4 arms (S1 + S2 + S3 + S4 sub-pockets of trypsin / thrombin).
+  estrela: {
+    id: 'estrela', name: 'Molécula Estrela', tint: 0xfff0b3,
+    about: 'Molécula inventada de 4 pontas: positiva média, oleosa média, média que gosta de água e oleosa média.',
+    groups: [g(2, 'pos'), g(2, 'oil'), g(2, 'polar'), g(2, 'oil')],
+  },
+  cruz: {
+    id: 'cruz', name: 'Molécula Cruz', tint: 0xd4f0ff,
+    about: 'Molécula inventada de 4 pontas, igual à Estrela mas com a ponta que gosta de água pequena.',
+    groups: [g(2, 'pos'), g(2, 'oil'), g(1, 'polar'), g(2, 'oil')],
+  },
+  helice: {
+    id: 'helice', name: 'Molécula Hélice', tint: 0xe8d4ff,
+    about: 'Molécula inventada de 4 pontas, igual à Estrela mas com a ponta positiva pequena.',
+    groups: [g(1, 'pos'), g(2, 'oil'), g(2, 'polar'), g(2, 'oil')],
+  },
+  tranca: {
+    id: 'tranca', name: 'Molécula Trança', tint: 0xffd9c2,
+    about: 'Molécula inventada com as MESMAS pontas da Estrela, mas em outra ordem ao redor do anel.',
+    groups: [g(2, 'pos'), g(2, 'oil'), g(2, 'oil'), g(2, 'polar')],
+  },
+  garra: {
+    id: 'garra', name: 'Molécula Garra', tint: 0xffc4c4,
+    about: 'Molécula inventada de 4 pontas com a ponta principal NEGATIVA (−).',
+    groups: [g(2, 'neg'), g(2, 'oil'), g(2, 'polar'), g(2, 'oil')],
+  },
+  polvo: {
+    id: 'polvo', name: 'Molécula Polvo', tint: 0xc9f2d9,
+    about: 'Molécula inventada de 4 pontas: positiva média, oleosa PEQUENA, média que gosta de água e oleosa GRANDE.',
+    groups: [g(2, 'pos'), g(1, 'oil'), g(2, 'polar'), g(3, 'oil')],
+  },
+  ponte: {
+    id: 'ponte', name: 'Molécula Ponte', tint: 0xf2e2c9,
+    about: 'Molécula inventada parecida com a Polvo, mas com a última ponta oleosa média.',
+    groups: [g(2, 'pos'), g(1, 'oil'), g(2, 'polar'), g(2, 'oil')],
+  },
+  // Expert, 5 arms (β2 receptor: Asp113 anchor, aromatic cluster, Ser203/207 switch, hydrophobic and polar contacts).
+  farol: {
+    id: 'farol', name: 'Molécula Farol', tint: 0xfff3a0,
+    about: 'Molécula inventada de 5 pontas com uma ponta média que gosta de água, do tamanho exato do interruptor.',
+    groups: [g(1, 'pos'), g(3, 'oil'), g(2, 'polar'), g(2, 'oil'), g(1, 'polar')],
+  },
+  coroa: {
+    id: 'coroa', name: 'Molécula Coroa', tint: 0xa8d8ff,
+    about: 'Molécula inventada de 5 pontas, parecida com a Farol, mas com a ponta do meio que gosta de água PEQUENA.',
+    groups: [g(1, 'pos'), g(3, 'oil'), g(1, 'polar'), g(2, 'oil'), g(1, 'polar')],
+  },
+  flor: {
+    id: 'flor', name: 'Molécula Flor', tint: 0xffd1ec,
+    about: 'Molécula inventada de 5 pontas, parecida com a Farol, mas com uma ponta oleosa pequena.',
+    groups: [g(1, 'pos'), g(3, 'oil'), g(2, 'polar'), g(1, 'oil'), g(1, 'polar')],
+  },
+  leque: {
+    id: 'leque', name: 'Molécula Leque', tint: 0xd9f7c4,
+    about: 'Molécula inventada com as mesmas pontas da Farol, mas em outra ordem ao redor do anel.',
+    groups: [g(1, 'pos'), g(3, 'oil'), g(2, 'oil'), g(2, 'polar'), g(1, 'polar')],
+  },
+  martelo: {
+    id: 'martelo', name: 'Molécula Martelo', tint: 0xe4e0ff,
+    about: 'Molécula inventada de 5 pontas com a ponta positiva MÉDIA.',
+    groups: [g(2, 'pos'), g(3, 'oil'), g(1, 'polar'), g(2, 'oil'), g(1, 'polar')],
+  },
+  sombra: {
+    id: 'sombra', name: 'Molécula Sombra', tint: 0xcfd6e6,
+    about: 'Molécula inventada de 5 pontas sem nenhuma carga.',
+    groups: [g(1, 'polar'), g(3, 'oil'), g(1, 'polar'), g(2, 'oil'), g(1, 'polar')],
   },
   pluma: {
     id: 'pluma', name: 'Molécula Pluma', tint: 0xe6c8ff,
@@ -182,6 +257,32 @@ export const TARGETS: Record<TargetId, TargetDef> = {
     cavities: [{ size: 2, chem: 'polar' }, { size: 3, chem: 'oil' }, { size: 2, chem: 'oil' }],
     anchor: -1, switchCavity: -1, effect: 'Formando coágulo', word: 'Coágulo!',
   },
+  beta2_facil: {
+    id: 'beta2_facil', name: 'Receptor β2', short: 'receptor β2', pdb: '2RH1', color: 0x8fc8ff,
+    role: 'Receptor na parede da célula. Ligado, manda a célula do pulmão relaxar.',
+    cavities: [{ size: 1, chem: 'polar' }, { size: 3, chem: 'oil' }, { size: 2, chem: 'polar' }],
+    anchor: -1, switchCavity: 2, effect: 'Recado enviado', word: 'Ligou!', sideTilt: 40,
+  },
+  // Expert pockets: the sub-sites around the real ligands. Trypsin and thrombin share S1 (Asp189) and S3; thrombin's
+  // S2 is small (closed by the 60-loop) and its S4 "aryl-binding site" is large and oily.
+  tripsina_exp: {
+    id: 'tripsina_exp', name: 'Tripsina', short: 'tripsina', pdb: '1BJU', color: 0xb9a8ff,
+    role: 'Enzima da digestão: corta as proteínas dos alimentos.',
+    cavities: [{ size: 2, chem: 'neg' }, { size: 2, chem: 'oil' }, { size: 2, chem: 'polar' }, { size: 2, chem: 'oil' }],
+    anchor: 0, switchCavity: -1, effect: 'Cortando proteínas', word: 'Cortou!',
+  },
+  trombina_exp: {
+    id: 'trombina_exp', name: 'Trombina', short: 'trombina', pdb: '1PPB', color: 0xffb08f,
+    role: 'Enzima da coagulação: ajuda a formar coágulos no sangue.',
+    cavities: [{ size: 2, chem: 'neg' }, { size: 1, chem: 'oil' }, { size: 2, chem: 'polar' }, { size: 3, chem: 'oil' }],
+    anchor: 0, switchCavity: -1, effect: 'Formando coágulo', word: 'Coágulo!',
+  },
+  beta2_exp: {
+    id: 'beta2_exp', name: 'Receptor β2', short: 'receptor β2', pdb: '2RH1', color: 0x8fc8ff,
+    role: 'Receptor na parede da célula. Ligado, manda a célula do pulmão relaxar.',
+    cavities: [{ size: 1, chem: 'neg' }, { size: 3, chem: 'oil' }, { size: 2, chem: 'polar' }, { size: 2, chem: 'oil' }, { size: 1, chem: 'polar' }],
+    anchor: 0, switchCavity: 2, effect: 'Recado enviado', word: 'Ligou!', sideTilt: 40,
+  },
   beta2: {
     id: 'beta2', name: 'Receptor β2', short: 'receptor β2', pdb: '2RH1', color: 0x8fc8ff,
     role: 'Receptor na parede da célula. Ligado, manda a célula do pulmão relaxar.',
@@ -199,7 +300,7 @@ export const TIER_NAME: Record<Tier, string> = { facil: 'Fácil', padrao: 'Padr�
 export const TIER_ABOUT: Record<Tier, string> = {
   facil: 'Para crianças: só formato, óleo e água. Basta girar a molécula.',
   padrao: 'Cargas + e −, interruptor do receptor e seletividade. É preciso girar e virar.',
-  especialista: 'Para quem conhece docking: mais moléculas parecidas, nota do encaixe e nenhuma ajuda.',
+  especialista: 'Para quem conhece docking: bolsos com 4 e 5 pontos de contato, nota do encaixe e nenhuma ajuda.',
 }
 
 export type LevelDef = {
@@ -236,8 +337,8 @@ export const LEVELS: LevelDef[] = [
     id: 2, tier: 'facil', kind: 'block', title: 'Fase 2 · Ligar ou bloquear?', seconds: 90,
     intro: 'O receptor β2 atravessa a membrana da célula. O bolso fica do lado de FORA. Quando o mensageiro natural encaixa e aperta o "interruptor" (anel tracejado), um recado passa para DENTRO da célula.',
     goal: 'Encontre a molécula que ocupa o receptor SEM apertar o interruptor, para o recado parar.',
-    targets: ['beta2'], tray: ['gota', 'raio2', 'cometa', 'pluma', 'escudo'], natural: 'mensageiro', turnOnly: true,
-    learned: 'Moléculas que encaixam e LIGAM o receptor se chamam agonistas. As que encaixam e só BLOQUEIAM se chamam antagonistas. As duas encaixam, mas fazem coisas opostas! A Escudo tem a ponta que gosta de água curtinha demais: não alcança o interruptor.',
+    targets: ['beta2_facil'], tray: ['gota', 'raio_f', 'folha', 'grao', 'escudo_f'], natural: 'mensageiro_f', turnOnly: true,
+    learned: 'Moléculas que encaixam e LIGAM o receptor se chamam agonistas (a Raio). As que encaixam e só BLOQUEIAM se chamam antagonistas (a Escudo). As duas encaixam, mas fazem coisas opostas! A Escudo tem a ponta que gosta de água curtinha demais: não alcança o interruptor.',
   },
   {
     id: 3, tier: 'facil', kind: 'block', title: 'Fase 3 · Trave a trombina', seconds: 90,
@@ -262,54 +363,33 @@ export const LEVELS: LevelDef[] = [
     learned: 'A Escudo encaixa, mas a ponta que gosta de água é curta demais para apertar o interruptor: é um antagonista (bloqueador).',
   },
   {
-    id: 13, tier: 'padrao', kind: 'activate', title: 'Fase 3 · Ligue o receptor', seconds: 90,
-    intro: 'Agora é o contrário: queremos que o receptor β2 mande o recado, como faz o mensageiro natural.',
-    goal: 'Encaixe FORTE e aperte o interruptor do receptor β2.',
-    targets: ['beta2'], tray: ['escudo', 'pluma', 'raio', 'faisca', 'gota'], natural: 'mensageiro',
-    learned: 'A Raio encaixa e aperta o interruptor: é um agonista, faz o mesmo que o mensageiro natural.',
-  },
-  {
-    id: 14, tier: 'padrao', kind: 'block', title: 'Fase 4 · Trave a trombina', seconds: 90,
-    intro: 'A trombina ajuda o sangue a coagular. O bolso dela parece com o da tripsina, mas tem DOIS buracos oleosos.',
-    goal: 'Encaixe FORTE no bolso da trombina.',
-    targets: ['trombina'], tray: ['cometa', 'gota', 'trevo', 'faisca', 'pluma'], natural: 'substrato',
-    learned: 'A Trevo tem duas partes oleosas, uma grande e uma média: combina com os dois buracos oleosos da trombina.',
-  },
-  {
-    id: 15, tier: 'padrao', kind: 'selective', title: 'Fase 5 · A molécula que escolhe', seconds: 100,
+    id: 13, tier: 'padrao', kind: 'selective', title: 'Fase 3 · A molécula que escolhe', seconds: 100,
     intro: 'Trombina e tripsina são enzimas "primas": os bolsos são parecidos. Queremos travar a trombina (coagulação) sem atrapalhar a tripsina (digestão).',
     goal: 'Trave a TROMBINA e deixe a TRIPSINA livre. A molécula testa as duas ao mesmo tempo.',
     targets: ['tripsina', 'trombina'], tray: ['faisca', 'cometa', 'gigante', 'trevo'], blockTarget: 'trombina',
     learned: 'Moléculas SELETIVAS encaixam bem só no alvo certo. A Trevo tem uma parte média oleosa que cabe no bolsinho da trombina, mas é grande demais para o da tripsina. Menos efeitos indesejados!',
   },
-  // ------------------------------------------------------------------ Especialista
+  // ------------------------------------------------------------------ Especialista (4 and 5 contact points)
   {
-    id: 21, tier: 'especialista', kind: 'best', title: 'Fase 1 · O melhor encaixe', seconds: 120,
-    intro: 'Várias moléculas encaixam forte na tripsina. Num projeto de fármaco, escolhemos a de MAIOR afinidade. Aqui cada encaixe recebe uma nota de 0 a 100.',
-    goal: 'Encontre a molécula com a MAIOR nota de encaixe na tripsina.',
-    targets: ['tripsina'], tray: ['escudo', 'seta', 'cometa', 'raio', 'gota', 'trevo'],
-    learned: 'Escudo, Seta e Cometa encaixam forte, mas só a Cometa preenche os três buracos com o tamanho e a química exatos (nota 100). É o mesmo raciocínio de ordenar moléculas por pontuação num docking virtual.',
+    id: 21, tier: 'especialista', kind: 'best', title: 'Fase 1 · Quatro sub-bolsos', seconds: 150,
+    intro: 'Remédios de verdade tocam vários sub-bolsos da enzima ao mesmo tempo. Aqui o bolso da tripsina tem QUATRO (S1 a S4) e as moléculas têm quatro pontas. Várias encaixam forte: cada encaixe ganha uma nota de 0 a 100.',
+    goal: 'Encontre a molécula com a MAIOR nota de encaixe nos quatro sub-bolsos da tripsina.',
+    targets: ['tripsina_exp'], tray: ['cruz', 'tranca', 'estrela', 'garra', 'helice', 'polvo'],
+    learned: 'Cruz e Hélice encaixam forte, mas sobra espaço em um sub-bolso (nota 95). A Trança tem as mesmas pontas da Estrela em outra ordem: a ORDEM ao redor do anel importa. Só a Estrela preenche os quatro sub-bolsos com tamanho e química exatos (nota 100).',
   },
   {
-    id: 22, tier: 'especialista', kind: 'activate', title: 'Fase 2 · Agonista entre impostores', seconds: 120,
-    intro: 'Seis moléculas parecidas. Várias escorregam, uma encaixa mas só bloqueia. Apenas uma LIGA o receptor β2.',
-    goal: 'Encontre o agonista: encaixe forte que aperta o interruptor do β2.',
-    targets: ['beta2'], tray: ['escudo', 'cometa', 'raio', 'faisca', 'pluma', 'gota'],
-    learned: 'O interruptor só é apertado quando a parte que gosta de água tem o tamanho EXATO do buraco. A Escudo encaixa tão bem quanto, mas sem ativar: antagonista.',
+    id: 22, tier: 'especialista', kind: 'block', title: 'Fase 2 · Cinco pontos no receptor', seconds: 150,
+    intro: 'O bolso do receptor β2 tem CINCO pontos de contato: a âncora negativa (Asp113), um grupo oleoso grande, o interruptor (serinas da hélice 5), um ponto oleoso médio e um pequeno que gosta de água. Três moléculas encaixam forte. Só uma bloqueia.',
+    goal: 'Ocupe os cinco pontos do β2 SEM apertar o interruptor.',
+    targets: ['beta2_exp'], tray: ['farol', 'leque', 'coroa', 'martelo', 'flor', 'sombra'],
+    learned: 'Farol e Flor encaixam e apertam o interruptor: agonistas. A Coroa encaixa nos cinco pontos, mas a ponta do meio é pequena demais para o interruptor: antagonista. Uma única ponta decide entre ligar e bloquear.',
   },
   {
-    id: 23, tier: 'especialista', kind: 'best', title: 'Fase 3 · O melhor na trombina', seconds: 120,
-    intro: 'Na trombina, mais de uma molécula encaixa forte. Compare as notas de encaixe.',
-    goal: 'Encontre a molécula com a MAIOR nota de encaixe na trombina.',
-    targets: ['trombina'], tray: ['cometa', 'seta', 'trevo', 'escudo', 'nuvem', 'gigante'],
-    learned: 'A Seta encaixa forte, mas a pontinha oleosa sobra no buraco médio. A Trevo preenche os dois buracos oleosos por inteiro: nota 100.',
-  },
-  {
-    id: 24, tier: 'especialista', kind: 'selective', title: 'Fase 4 · Seletividade fina', seconds: 120,
-    intro: 'Agora várias moléculas grudam nas DUAS enzimas. Pense no buraco que é diferente entre elas.',
+    id: 23, tier: 'especialista', kind: 'selective', title: 'Fase 3 · Seletividade nos sub-bolsos', seconds: 150,
+    intro: 'Tripsina e trombina têm os mesmos sub-bolsos S1 e S3. A diferença está no S2 (pequeno na trombina) e no S4 (grande e oleoso na trombina). A molécula testa as duas enzimas ao mesmo tempo.',
     goal: 'Trave a TROMBINA e deixe a TRIPSINA totalmente livre.',
-    targets: ['tripsina', 'trombina'], tray: ['cometa', 'seta', 'trevo', 'escudo', 'faisca', 'gigante'], blockTarget: 'trombina',
-    learned: 'Cometa, Seta e Escudo cabem no buraco pequeno da tripsina: grudam nas duas enzimas. Só a Trevo, com a parte média oleosa, é grande demais para a tripsina. Seletividade vem de explorar a diferença entre os bolsos.',
+    targets: ['tripsina_exp', 'trombina_exp'], tray: ['estrela', 'ponte', 'tranca', 'polvo', 'garra', 'cruz'], blockTarget: 'trombina_exp',
+    learned: 'A Ponte gruda nas duas enzimas. Estrela e Cruz não cabem no S2 pequeno da trombina. A Polvo tem a ponta oleosa pequena para o S2 e a GRANDE para o S4 da trombina, que não cabe no S4 da tripsina: é seletiva. Anticoagulantes seletivos de verdade exploram diferenças como essas.',
   },
   // ------------------------------------------------------------------ free lab bench
   {

@@ -47,20 +47,22 @@ for (const seq of keys) {
 if (fit !== 'strong') fail(`never reached a strong fit, last ${fit}`)
 
 // Every stage of every difficulty: the right molecule wins (blockers also turn away the natural molecule).
-const stages = [[1, 'folha'], [2, 'escudo'], [3, 'laco'], [11, 'cometa'], [12, 'escudo'], [13, 'raio'], [14, 'trevo'], [15, 'trevo', 1],
-  [21, 'cometa'], [22, 'raio'], [23, 'trevo'], [24, 'trevo', 1]].map(([id, sol, target = 0]) => ({ id, sol, target }))
+const stages = [[1, 'folha'], [2, 'escudo_f'], [3, 'laco'], [11, 'cometa'], [12, 'escudo'], [13, 'trevo', 1],
+  [21, 'estrela'], [22, 'coroa'], [23, 'polvo', 1]].map(([id, sol, target = 0]) => ({ id, sol, target }))
 for (const { id, sol, target } of stages) {
   await page.evaluate(([id, sol, target]) => { const g = window.__game.game; g.startLevel(id); g.debugDock(sol, target) }, [id, sol, target])
   await page.waitForFunction(() => window.__game.game.isWon, null, { timeout: 30000 }).catch(() => fail(`stage ${id} not won with ${sol}`))
 }
 // Wrong drug must not win the selective stage.
-await page.evaluate(() => { const g = window.__game.game; g.startLevel(15); g.debugDock('cometa', 1) })
+await page.evaluate(() => { const g = window.__game.game; g.startLevel(13); g.debugDock('cometa', 1) })
 await page.waitForTimeout(6000)
-if (await page.evaluate(() => window.__game.game.isWon)) fail('non-selective Cometa should not win stage 15')
-// Best-fit stage: a strong but lower-scoring molecule must not win.
-await page.evaluate(() => { const g = window.__game.game; g.startLevel(21); g.debugDock('escudo') })
-await page.waitForTimeout(3000)
-if (await page.evaluate(() => window.__game.game.isWon)) fail('Escudo (score 94) should not win stage 21')
+if (await page.evaluate(() => window.__game.game.isWon)) fail('non-selective Cometa should not win stage 13')
+// Expert: a strong but lower-scoring molecule must not win; nor an agonist in the 5-point receptor.
+for (const [id, mol] of [[21, 'cruz'], [22, 'farol']]) {
+  await page.evaluate(([id, mol]) => { const g = window.__game.game; g.startLevel(id); g.debugDock(mol) }, [id, mol])
+  await page.waitForTimeout(3000)
+  if (await page.evaluate(() => window.__game.game.isWon)) fail(`${mol} should not win stage ${id}`)
+}
 await page.evaluate(() => window.__game.game.startLevel(90))
 await page.waitForTimeout(500)
 await page.screenshot({ path: '/tmp/smoke.png' })

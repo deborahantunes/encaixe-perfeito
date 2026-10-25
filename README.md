@@ -36,12 +36,13 @@ The main menu has three modes:
 
 | Difficulty | Stages | Idea |
 | --- | --- | --- |
-| **Fácil** (easy, children) | 1 A chave certa · 2 Ligar ou bloquear? · 3 Trave a trombina | Shape + oil/water; turning is enough (turn-only docking) |
-| **Padrão** (standard) | 1 Trave a tripsina · 2 Bloqueie o receptor · 3 Ligue o receptor · 4 Trave a trombina · 5 A molécula que escolhe | +/− charges, agonist vs antagonist, selectivity; turn **and** flip |
-| **Especialista** (expert) | 1 O melhor encaixe · 2 Agonista entre impostores · 3 O melhor na trombina · 4 Seletividade fina | Look-alike decoys, a 0–100 fit score, rank by affinity, no help |
+| **Fácil** (easy, children) | 1 A chave certa · 2 Ligar ou bloquear? · 3 Trave a trombina | Only shape + oil/water (no charges at all); turning is enough (turn-only docking) |
+| **Padrão** (standard) | 1 Trave a tripsina · 2 Bloqueie o receptor · 3 A molécula que escolhe | +/− charges, agonist vs antagonist, selectivity; turn **and** flip |
+| **Especialista** (expert) | 1 Quatro sub-bolsos · 2 Cinco pontos no receptor · 3 Seletividade nos sub-bolsos | Pockets with 4 (protease sub-sites S1–S4) and 5 (β2 receptor) contact points, 4- and 5-arm molecules, look-alike decoys (same arms in another order), a 0–100 fit score, no help |
 
-Every stage has exactly one correct molecule (checked by `tests/rules.test.ts`). Easy Stages 1 and 3 use
-uncharged versions of the real trypsin (PDB 1BJU) and thrombin (PDB 1PPB) pockets. In the easy stages the
+Each difficulty has 3 stages and every stage has exactly one correct molecule (checked by `tests/rules.test.ts`).
+The easy stages use uncharged versions of the real trypsin (PDB 1BJU), β2 receptor (PDB 2RH1) and thrombin (PDB 1PPB)
+pockets. The expert pockets are carved on the same real surfaces with 4 or 5 wells. In the easy stages the
 molecule settles on its correct face by itself, so it never has to be flipped over by hand. The β2 receptor
 (PDB 2RH1) is tilted 40° towards the player so the wells are easy to see. The old tutorial was removed: the
 first stage of each difficulty explains how to grab and turn a molecule.

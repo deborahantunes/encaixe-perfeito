@@ -2,13 +2,19 @@ import { t } from '../i18n'
 import { CHEM_LABEL, SIZE_LABEL, type Cavity, type Group, type MoleculeDef, type TargetDef } from './data'
 
 export type FitClass = 'clash' | 'repel' | 'slip' | 'weak' | 'strong'
-/** perm[cavityIndex] = arm index of the molecule placed in that cavity. */
-export type Perm = [number, number, number]
+/** perm[cavityIndex] = arm index of the molecule placed in that cavity (3, 4 or 5 arms). */
+export type Perm = number[]
 
-export const PERMS: Perm[] = [
-  [0, 1, 2], [1, 2, 0], [2, 0, 1], // rotations
-  [0, 2, 1], [2, 1, 0], [1, 0, 2], // flipped
-]
+/** Every way an n-arm molecule can sit in an n-well pocket: n turns, and n turns of the flipped molecule. */
+export function permsFor(n: number): Perm[] {
+  const out: Perm[] = []
+  for (let k = 0; k < n; k++) out.push(Array.from({ length: n }, (_, j) => (j + k) % n))
+  for (let m = 0; m < n; m++) { const k = (n - m) % n; out.push(Array.from({ length: n }, (_, j) => (k - j + n) % n)) }
+  return out
+}
+
+/** Orientations of the classic 3-arm molecules: 3 rotations, then 3 flipped. */
+export const PERMS: Perm[] = permsFor(3)
 
 export const THRESHOLDS = { strong: 0.78, weak: 0.45 }
 
@@ -108,7 +114,8 @@ function cavityAdj(size: number): string {
  */
 export function evaluateTurnOnly(mol: MoleculeDef, target: TargetDef, perm: Perm): FitResult {
   const a = evaluate(mol, target, perm)
-  const b = evaluate(mol, target, [perm[0], perm[2], perm[1]])
+  const n = perm.length
+  const b = evaluate(mol, target, perm.map((_, c) => perm[(n - c) % n]))
   return rank(b.fit) > rank(a.fit) || (rank(b.fit) === rank(a.fit) && b.affinity > a.affinity) ? b : a
 }
 
@@ -120,8 +127,9 @@ export function rank(fit: FitClass): number {
 
 /** Best result over all orientations (used for hints and the lab notebook). */
 export function bestFit(mol: MoleculeDef, target: TargetDef): FitResult {
-  let best = evaluate(mol, target, PERMS[0])
-  for (const p of PERMS.slice(1)) {
+  const perms = permsFor(target.cavities.length)
+  let best = evaluate(mol, target, perms[0])
+  for (const p of perms.slice(1)) {
     const r = evaluate(mol, target, p)
     if (rank(r.fit) > rank(best.fit) || (rank(r.fit) === rank(best.fit) && r.affinity > best.affinity)) best = r
   }

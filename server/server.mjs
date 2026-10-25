@@ -12,7 +12,7 @@
 import { createServer } from 'node:http'
 import { randomBytes, randomInt } from 'node:crypto'
 import { WebSocketServer, WebSocket } from 'ws'
-import { LEVELS, TEAM_COLORS, TEAM_NAMES, TIERS, challengeList, judge, roundPoints, validPerm } from './shared/challenges.mjs'
+import { TEAM_COLORS, TEAM_NAMES, TIERS, armsOf, challengeList, judge, roundPoints, validPerm } from './shared/challenges.mjs'
 
 export const MARKER = 'encaixe-desafio-v1'
 const HOST = process.env.HOST || '127.0.0.1'
@@ -272,7 +272,7 @@ class Room {
     if (aid <= t.lastAid) { send(ws, { type: 'judged', aid, duplicate: true }); return }
     const ch = this.challenge
     if (this.phase !== 'round' || msg.round !== this.round || !ch) { t.lastAid = aid; send(ws, { type: 'judged', aid, late: true }); return }
-    if (typeof msg.mol !== 'string' || !ch.tray.includes(msg.mol) || !validPerm(msg.perm)) return
+    if (typeof msg.mol !== 'string' || !ch.tray.includes(msg.mol) || !validPerm(msg.perm, armsOf(ch))) return
     t.lastAid = aid
     const r = this.cur(t)
     if (r.solved) { send(ws, { type: 'judged', aid, ok: true, already: true, points: r.points, total: t.score }); return }

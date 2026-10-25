@@ -3,15 +3,20 @@
  * room server (authoritative scoring; bundled to server/shared/challenges.mjs by scripts/build-shared.mjs).
  */
 import { LEVELS, MOLECULES, TARGETS, TIERS, stagesOf, type LevelDef, type MoleculeId, type Tier } from './data'
-import { PERMS, bestFit, evaluate, evaluateTurnOnly, type FitClass, type FitResult, type Perm } from './rules'
+import { bestFit, evaluate, evaluateTurnOnly, permsFor, type FitClass, type FitResult, type Perm } from './rules'
 
 export { LEVELS, TIERS }
 export type { Tier }
 
 export type Judgement = { ok: boolean; fit: FitClass; activates: boolean; affinity: number }
 
-export function validPerm(p: unknown): p is Perm {
-  return Array.isArray(p) && p.length === 3 && PERMS.some(q => q[0] === p[0] && q[1] === p[1] && q[2] === p[2])
+/** Number of arms of the molecules (= wells of the pocket) in this stage: 3, 4 or 5. */
+export function armsOf(level: LevelDef): number {
+  return TARGETS[level.targets[0]].cavities.length
+}
+
+export function validPerm(p: unknown, n = 3): p is Perm {
+  return Array.isArray(p) && p.length === n && permsFor(n).some(q => q.every((x, i) => x === p[i]))
 }
 
 /** The fit the game shows for a molecule dropped with this orientation (turn-only stages forgive the face). */

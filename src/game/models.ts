@@ -22,9 +22,14 @@ export type ProteinMeta = {
 }
 export const PROTEIN_META = PROTEINS as unknown as Record<TargetId, ProteinMeta>
 
-/** Arm/cavity i direction in the local XY plane (arm 0 points up). */
-export function armDir(i: number, out = new THREE.Vector3()): THREE.Vector3 {
-  const a = Math.PI / 2 + (i * 2 * Math.PI) / 3
+/** Arm length for molecules / pockets with n arms (more arms need more room between neighbours). */
+export function armRadius(n: number): number {
+  return n <= 3 ? ARM_R : n === 4 ? 0.066 : 0.074
+}
+
+/** Arm/cavity i direction (of n) in the local XY plane (arm 0 points up). */
+export function armDir(i: number, out = new THREE.Vector3(), n = 3): THREE.Vector3 {
+  const a = Math.PI / 2 + (i * 2 * Math.PI) / n
   return out.set(Math.cos(a), Math.sin(a), 0)
 }
 
@@ -157,21 +162,24 @@ export function buildMolecule(def: MoleculeDef): THREE.Group {
     m.quaternion.setFromUnitVectors(up, d.normalize())
     root.add(m)
   }
-  // Neutral core: a six-atom ring; arms leave from vertices 0, 2, 4 (= arm directions).
-  const ringR = 0.017
+  // Neutral core: a six-atom ring with arms from vertices 0, 2, 4; 4- and 5-arm molecules use a 4- or 5-atom ring.
+  const n = def.groups.length
+  const rn = n === 3 ? 6 : n
+  const ringR = n === 3 ? 0.017 : 0.019
+  const armLen = armRadius(n)
   const ring: THREE.Vector3[] = []
-  for (let k = 0; k < 6; k++) {
-    const a = Math.PI / 2 + (k * Math.PI) / 3
+  for (let k = 0; k < rn; k++) {
+    const a = Math.PI / 2 + (k * 2 * Math.PI) / rn
     ring.push(new THREE.Vector3(Math.cos(a) * ringR, Math.sin(a) * ringR, 0))
   }
-  ring.forEach((p, k) => { atom(p, CORE_COLOR); bond(p, ring[(k + 1) % 6], CORE_COLOR, k % 2 ? BOND_R : BOND_R * 1.3) })
+  ring.forEach((p, k) => { atom(p, CORE_COLOR); bond(p, ring[(k + 1) % rn], CORE_COLOR, k % 2 ? BOND_R : BOND_R * 1.3) })
 
   const dir = new THREE.Vector3()
   const side = new THREE.Vector3()
   def.groups.forEach((gr, i) => {
-    armDir(i, dir)
+    armDir(i, dir, n)
     side.set(-dir.y, dir.x, 0)
-    const start = ring[(i * 2) % 6]
+    const start = ring[(i * rn / n) % rn]
     if (gr.size === 0) {
       const tip = dir.clone().multiplyScalar(ringR + 0.012)
       bond(start, tip, CORE_COLOR)
@@ -179,7 +187,7 @@ export function buildMolecule(def: MoleculeDef): THREE.Group {
       return
     }
     const color = CHEM_COLOR[gr.chem]
-    const c = dir.clone().multiplyScalar(ARM_R)
+    const c = dir.clone().multiplyScalar(armLen)
     let pts: THREE.Vector3[]
     if (gr.size === 1) pts = [c.clone().addScaledVector(dir, -0.004)]
     else if (gr.size === 2) {
@@ -221,7 +229,7 @@ export function buildMolecule(def: MoleculeDef): THREE.Group {
       root.add(icon)
     }
   })
-  const hit = new THREE.Mesh(cached('hit', () => new THREE.SphereGeometry(0.095, 12, 8)), new THREE.MeshBasicMaterial({ visible: false }))
+  const hit = new THREE.Mesh(cached(`hit${n}`, () => new THREE.SphereGeometry(n === 3 ? 0.095 : 0.11, 12, 8)), new THREE.MeshBasicMaterial({ visible: false }))
   hit.userData.grab = true
   root.add(hit)
   root.userData.hit = hit
@@ -275,7 +283,7 @@ export function buildReceptor(def: TargetDef): ReceptorModel {
   const rings: THREE.Mesh[] = []
   const dir = new THREE.Vector3()
   def.cavities.forEach((cav, i) => {
-    armDir(i, dir).multiplyScalar(ARM_R)
+    armDir(i, dir, def.cavities.length).multiplyScalar(armRadius(def.cavities.length))
     const r = HOLE_R[cav.size]
     const color = CHEM_COLOR[cav.chem]
     // Glowing ring at the depth where the group will sit, deep inside the carved well.

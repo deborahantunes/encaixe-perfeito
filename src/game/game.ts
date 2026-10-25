@@ -5,7 +5,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { CONFIG } from './config'
 import { CHEM_COLOR, LAB_LEVEL, LEVEL_BY_ID, MOLECULES, TARGETS, TIERS, TIER_ABOUT, TIER_NAME, stagesOf, type LevelDef, type MoleculeDef, type MoleculeId, type TargetId, type Tier } from './data'
 import { Fx } from './fx'
-import { armDir, buildMolecule, buildReceptor, labelTexture, type ReceptorModel } from './models'
+import { armDir, armRadius, buildMolecule, buildReceptor, labelTexture, type ReceptorModel } from './models'
 import { MINT, Panel, fitFont, font, roundRect, wrapText } from './panel'
 import { placeReceptor, receptorX } from './layout'
 import { t } from '../i18n'
@@ -15,7 +15,7 @@ import { RoomClient, serverUrl, type Judged, type PoseMol, type RoomState, type 
 import { ranking, teamName } from '../net/ranking'
 import { recordError } from '../core/errlog'
 import { track } from '../core/analytics'
-import { FIT_TITLE, PERMS, bestFit, effectText, evaluate, evaluateTurnOnly, rank, type FitResult, type Perm } from './rules'
+import { FIT_TITLE, bestFit, effectText, evaluate, evaluateTurnOnly, permsFor, rank, type FitResult, type Perm } from './rules'
 
 const V3 = THREE.Vector3
 const Q = THREE.Quaternion
@@ -893,23 +893,27 @@ export class Game {
   }
 
   private addTrayMolecule(def: MoleculeDef, i: number, n: number): void {
-    const rows = n > 5 ? 2 : 1
+    // 4- and 5-arm molecules (expert) are bigger: one wide arc instead of two rows, so they never overlap.
+    const big = def.groups.length > 3
+    const rows = n > 5 && !big ? 2 : 1
     const perRow = Math.ceil(n / rows)
     const row = Math.floor(i / perRow)
     const col = i % perRow
     const count = Math.min(perRow, n - row * perRow)
     const side = this.receptors.some(r => r.def.sideTilt)
-    const R = (row === 0 ? 0.52 : 0.4) - (side ? 0.08 : 0)
-    const step = (row === 0 ? 0.36 : 0.44) * (side ? 1.12 : 1)
+    const R = (big ? 0.6 : row === 0 ? 0.52 : 0.4) - (side ? 0.08 : 0)
+    const step = (big ? 0.4 : row === 0 ? 0.36 : 0.44) * (side ? 1.12 : 1)
     const a = -((count - 1) * step) / 2 + col * step
-    const y = (row === 0 ? 1.04 : 0.88) - (side ? 0.08 : 0)
+    const y = (big ? 1.0 : row === 0 ? 1.04 : 0.88) - (side ? 0.08 : 0)
+    const drop = big ? 0.03 : 0
     const pos = new V3(Math.sin(a) * R, y, -Math.cos(a) * R)
     const mol = new Mol(def, false)
     mol.home.copy(pos)
     const look = new THREE.Object3D()
     look.position.copy(pos)
     look.lookAt(0, y + 0.3, 0.3)
-    look.rotateZ(Math.floor(Math.random() * 3) * ((2 * Math.PI) / 3))
+    const arms = def.groups.length
+    look.rotateZ(Math.floor(Math.random() * arms) * ((2 * Math.PI) / arms))
     if (Math.random() < 0.5) look.rotateY(Math.PI)
     mol.homeQuat.copy(look.quaternion)
     mol.obj.position.copy(pos)
@@ -919,12 +923,12 @@ export class Game {
     // Pedestal + name label.
     const ped = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.004, 8, 40).rotateX(Math.PI / 2),
       new THREE.MeshBasicMaterial({ color: 0x3ee6b0, transparent: true, opacity: 0.55, toneMapped: false }))
-    ped.position.set(pos.x, pos.y - 0.095, pos.z)
+    ped.position.set(pos.x, pos.y - 0.095 - drop, pos.z)
     this.levelGroup.add(ped)
     const label = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.05),
       new THREE.MeshBasicMaterial({ map: labelTexture([{ text: def.name, size: 46, bold: true, color: def.natural ? '#ffc2d6' : '#ffffff' }], 512, 128), transparent: true, depthWrite: false, toneMapped: false }))
     const toPlayer = new V3(-pos.x, 0, -pos.z).normalize()
-    label.position.set(pos.x, pos.y - 0.105, pos.z).addScaledVector(toPlayer, 0.06)
+    label.position.set(pos.x, pos.y - 0.105 - drop, pos.z).addScaledVector(toPlayer, 0.06)
     label.lookAt(0, 1.5, 0.3)
     label.renderOrder = 2
     this.levelGroup.add(label)
@@ -1043,10 +1047,12 @@ export class Game {
     y += 6
     ctx.fillStyle = '#ffffff'
     ctx.font = font(29)
+    const hasSwitch = !!this.level && (this.level.kind === 'lab' ? [this.labTarget] : this.level.targets).some(id => TARGETS[id].switchCavity >= 0)
     const rules = simple ? [
       t('• Óleo com óleo, água com água'),
       t('• A bolinha precisa CABER no buraco'),
       t('• Gire a molécula até as cores combinarem'),
+      ...(hasSwitch ? [t('• Anel tracejado = interruptor')] : []),
     ] : [
       t('• Opostos se atraem: + com −'),
       t('• Iguais se empurram: + com +'),
@@ -1213,7 +1219,7 @@ export class Game {
     } else {
       ctx.fillStyle = '#c9c4e8'
       ctx.font = font(29)
-      let yy = wrapText(ctx, t('Pegue uma molécula da bandeja e leve até o bolso da proteína (os três buracos coloridos na superfície).'), 40, y + 10, w - 80, 37, Math.min(3, Math.max(0, Math.floor((bottom - y - 10) / 37))))
+      let yy = wrapText(ctx, t('Pegue uma molécula da bandeja e leve até o bolso da proteína (os buracos coloridos na superfície).'), 40, y + 10, w - 80, 37, Math.min(3, Math.max(0, Math.floor((bottom - y - 10) / 37))))
       if (level.kind === 'lab' && yy < bottom - 120) {
         ctx.fillStyle = '#7fc8ff'
         ctx.font = font(26, 'bold')
@@ -1266,7 +1272,7 @@ export class Game {
     const occ = rec.occupant
     const blocked = !!occ && occ.state === 'docked' && !occ.result?.activates && (occ.result?.fit === 'strong' || occ.result?.fit === 'weak')
     if (level?.kind === 'selective') {
-      const job = rec.def.id === 'trombina' ? t('Coagulação') : t('Digestão')
+      const job = rec.def.id.startsWith('trombina') ? t('Coagulação') : t('Digestão')
       label = blocked ? t('{job}: TRAVADA', { job }) : t('{job}: funcionando', { job })
       value = blocked ? 1 : 0.08
     } else {
@@ -1407,7 +1413,7 @@ export class Game {
       if (p.kind === 'mouse') {
         if (p.rotateSteps !== 0) {
           const axis = new V3(0, 0, 1)
-          held.mouseQuat.premultiply(new Q().setFromAxisAngle(axis, -p.rotateSteps * ((2 * Math.PI) / 3)))
+          held.mouseQuat.premultiply(new Q().setFromAxisAngle(axis, -p.rotateSteps * ((2 * Math.PI) / held.def.groups.length)))
           p.rotateSteps = 0
           this.audio.play('click')
         }
@@ -1575,11 +1581,13 @@ export class Game {
     const recQ = this.levelGroup.getWorldQuaternion(new Q()).multiply(rec.quat)
     const cam = (this.renderer.xr.isPresenting ? this.renderer.xr.getCamera() : this.camera).getWorldQuaternion(new Q()).invert()
     const flat = (v: THREE.Vector3) => { v.applyQuaternion(cam); v.z = 0; return v.normalize() }
-    const w = [0, 1, 2].map(i => flat(armDir(i).applyQuaternion(molQ)))
-    const c = [0, 1, 2].map(i => flat(armDir(i).applyQuaternion(recQ)))
-    let best = PERMS[0]
+    const n = rec.def.cavities.length
+    const w = mol.def.groups.map((_, i) => flat(armDir(i, new V3(), n).applyQuaternion(molQ)))
+    const c = rec.def.cavities.map((_, i) => flat(armDir(i, new V3(), n).applyQuaternion(recQ)))
+    const perms = permsFor(n)
+    let best = perms[0]
     let be = Infinity
-    for (const p of PERMS) {
+    for (const p of perms) {
       const e = c.reduce((s, cj, j) => s + w[p[j]].angleTo(cj), 0)
       if (e < be) { be = e; best = p }
     }
@@ -1593,8 +1601,9 @@ export class Game {
       const y = z.clone().cross(x)
       return new THREE.Matrix4().makeBasis(x, y, z)
     }
-    const L = basis(armDir(perm[0]), armDir(perm[1]))
-    const W = basis(armDir(0), armDir(1))
+    const n = perm.length
+    const L = basis(armDir(perm[0], new V3(), n), armDir(perm[1], new V3(), n))
+    const W = basis(armDir(0, new V3(), n), armDir(1, new V3(), n))
     const R = W.multiply(L.transpose())
     return new Q().setFromRotationMatrix(R)
   }
@@ -1711,7 +1720,8 @@ export class Game {
     const cav = r.slots.findIndex(s => s.size === 'tooBig' || s.chem === 'repel')
     const away = rec.toLevel(new V3((Math.random() - 0.5) * 0.2, r.fit === 'slip' ? -0.16 : 0.06, 0.24))
     this.tween(mol, approach, mol.obj.quaternion.clone(), 0.18 * speed, easeOut, 0, () => {
-      const spot = cav >= 0 ? rec.toLevel(armDir(cav).multiplyScalar(0.058)) : rec.center
+      const nc = rec.def.cavities.length
+      const spot = cav >= 0 ? rec.toLevel(armDir(cav, new V3(), nc).multiplyScalar(armRadius(nc))) : rec.center
       const at = this.worldOf(spot)
       if (r.fit === 'clash') { this.fx.burst(at, 0xff4a4a, 18, 0.35, 0.025); this.audio.play('clash'); this.flashRing(rec, cav) }
       else if (r.fit === 'repel') {

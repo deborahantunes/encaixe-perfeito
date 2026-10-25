@@ -46,6 +46,20 @@ TARGETS = [
     dict(id='trombina_facil', pdb='1PPB', chains='HL', ligand='0G6', anchor=('H', 189, 'CG'),
          tint=(1.0, 0.68, 0.55), faces=60000, neutral=True,
          cavities=[(2, 'polar'), (3, 'oil'), (2, 'oil')]),
+    # Expert stages: 4 sub-pockets (S1-S4) in the proteases and 5 contact points in the β2 receptor.
+    dict(id='tripsina_exp', pdb='1BJU', chains='A', ligand='GP6', anchor=('A', 189, 'CG'),
+         tint=(0.70, 0.60, 1.0), faces=45000,
+         cavities=[(2, 'neg'), (2, 'oil'), (2, 'polar'), (2, 'oil')]),
+    dict(id='trombina_exp', pdb='1PPB', chains='HL', ligand='0G6', anchor=('H', 189, 'CG'),
+         tint=(1.0, 0.68, 0.55), faces=45000,
+         cavities=[(2, 'neg'), (1, 'oil'), (2, 'polar'), (3, 'oil')]),
+    # Easy Stage 2: uncharged wells (water, oil, water) and neutral charged residues.
+    dict(id='beta2_facil', pdb='2RH1', chains='A', ligand='CAU', anchor=('A', 113, 'CG'), maxres=999,
+         tint=(0.52, 0.76, 1.0), faces=50000, membrane=True, neutral=True,
+         cavities=[(1, 'polar'), (3, 'oil'), (2, 'polar')]),
+    dict(id='beta2_exp', pdb='2RH1', chains='A', ligand='CAU', anchor=('A', 113, 'CG'), maxres=999,
+         tint=(0.52, 0.76, 1.0), faces=50000, membrane=True,
+         cavities=[(1, 'neg'), (3, 'oil'), (2, 'polar'), (2, 'oil'), (1, 'polar')]),
     dict(id='beta2', pdb='2RH1', chains='A', ligand='CAU', anchor=('A', 113, 'CG'), maxres=999,
          tint=(0.52, 0.76, 1.0), faces=70000, membrane=True,
          cavities=[(1, 'neg'), (3, 'oil'), (2, 'polar')]),
@@ -57,9 +71,14 @@ HYDRO = {'ALA', 'VAL', 'LEU', 'ILE', 'PHE', 'TRP', 'MET', 'PRO', 'CYS', 'TYR'}
 BACKBONE = {'N', 'CA', 'C', 'O'}
 
 
-def arm_dir(i):
-    a = math.pi / 2 + i * 2 * math.pi / 3
+def arm_dir(i, n=3):
+    a = math.pi / 2 + i * 2 * math.pi / n
     return np.array([math.cos(a), math.sin(a), 0.0])
+
+
+def arm_r(n):
+    """Arm length in Å for n wells (mirrors armRadius() in src/game/models.ts)."""
+    return (0.058 if n <= 3 else 0.066 if n == 4 else 0.074) / SCALE
 
 
 def read_pdb(t):
@@ -120,8 +139,9 @@ def carve_sdf(p, cavities):
         return np.sqrt(d2 ** 2 + zneg ** 2) - (r + zpos * 0.55)
 
     d = column(0, 0, 2.9)
+    n = len(cavities)
     for i, (size, _) in enumerate(cavities):
-        c = arm_dir(i) * ARM_R
+        c = arm_dir(i, n) * arm_r(n)
         d = np.minimum(d, column(c[0], c[1], HOLE_R[size] / SCALE + 0.35))
         d = np.minimum(d, capsule(0, 0, c[0], c[1], 1.4))
     return d
@@ -190,7 +210,7 @@ def build(t):
     col = base * (1 - mixw[:, None]) + mixc * mixw[:, None]
     # Well walls show the game's chemistry clearly.
     for i, (size, chem) in enumerate(t['cavities']):
-        c = arm_dir(i) * ARM_R
+        c = arm_dir(i, len(t['cavities'])) * arm_r(len(t['cavities']))
         r = HOLE_R[size] / SCALE
         d2 = np.hypot(v[:, 0] - c[0], v[:, 1] - c[1])
         dz = np.minimum(v[:, 2], 0)

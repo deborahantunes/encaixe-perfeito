@@ -49,15 +49,6 @@ var MOLECULES = {
     about: "Mol\xE9cula inventada parecida com o mensageiro natural, mas com uma parte oleosa maior.",
     groups: [g(1, "pos"), g(3, "oil"), g(2, "polar")]
   },
-  // Stage 2 version of Raio: NEGATIVE tip (red), so children tell it apart from Escudo at a glance
-  // (it is pushed away by the receptor's negative anchor). The original Raio stays in the lab and challenges.
-  raio2: {
-    id: "raio2",
-    name: "Mol\xE9cula Raio",
-    tint: 16774048,
-    about: "Mol\xE9cula inventada parecida com a Escudo, mas com a ponta NEGATIVA (\u2212).",
-    groups: [g(1, "neg"), g(3, "oil"), g(2, "polar")]
-  },
   gota: {
     id: "gota",
     name: "Mol\xE9cula Gota",
@@ -127,13 +118,121 @@ var MOLECULES = {
     about: "Mol\xE9cula inventada com DUAS partes oleosas (uma grande e uma m\xE9dia) e uma parte que gosta de \xE1gua.",
     groups: [g(2, "polar"), g(3, "oil"), g(2, "oil")]
   },
-  // Expert decoy: binds strongly to both enzymes, but never as well as the best answer.
-  seta: {
-    id: "seta",
-    name: "Mol\xE9cula Seta",
-    tint: 14151848,
-    about: "Mol\xE9cula inventada: ponta positiva, parte oleosa grande e uma pontinha oleosa.",
-    groups: [g(2, "pos"), g(3, "oil"), g(1, "oil")]
+  // Easy Stage 2 (β2 receptor without charges): only size and oil/water decide.
+  mensageiro_f: {
+    id: "mensageiro_f",
+    name: "Mensageiro natural",
+    natural: true,
+    tint: 16761558,
+    about: 'Mol\xE9cula que o pr\xF3prio corpo fabrica para "ligar" o receptor e mandar um recado para a c\xE9lula.',
+    groups: [g(1, "polar"), g(2, "oil"), g(2, "polar")]
+  },
+  raio_f: {
+    id: "raio_f",
+    name: "Mol\xE9cula Raio",
+    tint: 16774048,
+    about: "Mol\xE9cula inventada parecida com o mensageiro natural, mas com uma parte oleosa maior.",
+    groups: [g(1, "polar"), g(3, "oil"), g(2, "polar")]
+  },
+  escudo_f: {
+    id: "escudo_f",
+    name: "Mol\xE9cula Escudo",
+    tint: 11065599,
+    about: "Mol\xE9cula inventada parecida com a Raio, mas com a ponta que gosta de \xE1gua bem curtinha.",
+    groups: [g(1, "polar"), g(3, "oil"), g(1, "polar")]
+  },
+  // Expert, 4 arms (S1 + S2 + S3 + S4 sub-pockets of trypsin / thrombin).
+  estrela: {
+    id: "estrela",
+    name: "Mol\xE9cula Estrela",
+    tint: 16773299,
+    about: "Mol\xE9cula inventada de 4 pontas: positiva m\xE9dia, oleosa m\xE9dia, m\xE9dia que gosta de \xE1gua e oleosa m\xE9dia.",
+    groups: [g(2, "pos"), g(2, "oil"), g(2, "polar"), g(2, "oil")]
+  },
+  cruz: {
+    id: "cruz",
+    name: "Mol\xE9cula Cruz",
+    tint: 13955327,
+    about: "Mol\xE9cula inventada de 4 pontas, igual \xE0 Estrela mas com a ponta que gosta de \xE1gua pequena.",
+    groups: [g(2, "pos"), g(2, "oil"), g(1, "polar"), g(2, "oil")]
+  },
+  helice: {
+    id: "helice",
+    name: "Mol\xE9cula H\xE9lice",
+    tint: 15258879,
+    about: "Mol\xE9cula inventada de 4 pontas, igual \xE0 Estrela mas com a ponta positiva pequena.",
+    groups: [g(1, "pos"), g(2, "oil"), g(2, "polar"), g(2, "oil")]
+  },
+  tranca: {
+    id: "tranca",
+    name: "Mol\xE9cula Tran\xE7a",
+    tint: 16767426,
+    about: "Mol\xE9cula inventada com as MESMAS pontas da Estrela, mas em outra ordem ao redor do anel.",
+    groups: [g(2, "pos"), g(2, "oil"), g(2, "oil"), g(2, "polar")]
+  },
+  garra: {
+    id: "garra",
+    name: "Mol\xE9cula Garra",
+    tint: 16762052,
+    about: "Mol\xE9cula inventada de 4 pontas com a ponta principal NEGATIVA (\u2212).",
+    groups: [g(2, "neg"), g(2, "oil"), g(2, "polar"), g(2, "oil")]
+  },
+  polvo: {
+    id: "polvo",
+    name: "Mol\xE9cula Polvo",
+    tint: 13234905,
+    about: "Mol\xE9cula inventada de 4 pontas: positiva m\xE9dia, oleosa PEQUENA, m\xE9dia que gosta de \xE1gua e oleosa GRANDE.",
+    groups: [g(2, "pos"), g(1, "oil"), g(2, "polar"), g(3, "oil")]
+  },
+  ponte: {
+    id: "ponte",
+    name: "Mol\xE9cula Ponte",
+    tint: 15917769,
+    about: "Mol\xE9cula inventada parecida com a Polvo, mas com a \xFAltima ponta oleosa m\xE9dia.",
+    groups: [g(2, "pos"), g(1, "oil"), g(2, "polar"), g(2, "oil")]
+  },
+  // Expert, 5 arms (β2 receptor: Asp113 anchor, aromatic cluster, Ser203/207 switch, hydrophobic and polar contacts).
+  farol: {
+    id: "farol",
+    name: "Mol\xE9cula Farol",
+    tint: 16774048,
+    about: "Mol\xE9cula inventada de 5 pontas com uma ponta m\xE9dia que gosta de \xE1gua, do tamanho exato do interruptor.",
+    groups: [g(1, "pos"), g(3, "oil"), g(2, "polar"), g(2, "oil"), g(1, "polar")]
+  },
+  coroa: {
+    id: "coroa",
+    name: "Mol\xE9cula Coroa",
+    tint: 11065599,
+    about: "Mol\xE9cula inventada de 5 pontas, parecida com a Farol, mas com a ponta do meio que gosta de \xE1gua PEQUENA.",
+    groups: [g(1, "pos"), g(3, "oil"), g(1, "polar"), g(2, "oil"), g(1, "polar")]
+  },
+  flor: {
+    id: "flor",
+    name: "Mol\xE9cula Flor",
+    tint: 16765420,
+    about: "Mol\xE9cula inventada de 5 pontas, parecida com a Farol, mas com uma ponta oleosa pequena.",
+    groups: [g(1, "pos"), g(3, "oil"), g(2, "polar"), g(1, "oil"), g(1, "polar")]
+  },
+  leque: {
+    id: "leque",
+    name: "Mol\xE9cula Leque",
+    tint: 14284740,
+    about: "Mol\xE9cula inventada com as mesmas pontas da Farol, mas em outra ordem ao redor do anel.",
+    groups: [g(1, "pos"), g(3, "oil"), g(2, "oil"), g(2, "polar"), g(1, "polar")]
+  },
+  martelo: {
+    id: "martelo",
+    name: "Mol\xE9cula Martelo",
+    tint: 14999807,
+    about: "Mol\xE9cula inventada de 5 pontas com a ponta positiva M\xC9DIA.",
+    groups: [g(2, "pos"), g(3, "oil"), g(1, "polar"), g(2, "oil"), g(1, "polar")]
+  },
+  sombra: {
+    id: "sombra",
+    name: "Mol\xE9cula Sombra",
+    tint: 13620966,
+    about: "Mol\xE9cula inventada de 5 pontas sem nenhuma carga.",
+    groups: [g(1, "polar"), g(3, "oil"), g(1, "polar"), g(2, "oil"), g(1, "polar")]
   },
   pluma: {
     id: "pluma",
@@ -196,6 +295,62 @@ var TARGETS = {
     effect: "Formando co\xE1gulo",
     word: "Co\xE1gulo!"
   },
+  beta2_facil: {
+    id: "beta2_facil",
+    name: "Receptor \u03B22",
+    short: "receptor \u03B22",
+    pdb: "2RH1",
+    color: 9423103,
+    role: "Receptor na parede da c\xE9lula. Ligado, manda a c\xE9lula do pulm\xE3o relaxar.",
+    cavities: [{ size: 1, chem: "polar" }, { size: 3, chem: "oil" }, { size: 2, chem: "polar" }],
+    anchor: -1,
+    switchCavity: 2,
+    effect: "Recado enviado",
+    word: "Ligou!",
+    sideTilt: 40
+  },
+  // Expert pockets: the sub-sites around the real ligands. Trypsin and thrombin share S1 (Asp189) and S3; thrombin's
+  // S2 is small (closed by the 60-loop) and its S4 "aryl-binding site" is large and oily.
+  tripsina_exp: {
+    id: "tripsina_exp",
+    name: "Tripsina",
+    short: "tripsina",
+    pdb: "1BJU",
+    color: 12167423,
+    role: "Enzima da digest\xE3o: corta as prote\xEDnas dos alimentos.",
+    cavities: [{ size: 2, chem: "neg" }, { size: 2, chem: "oil" }, { size: 2, chem: "polar" }, { size: 2, chem: "oil" }],
+    anchor: 0,
+    switchCavity: -1,
+    effect: "Cortando prote\xEDnas",
+    word: "Cortou!"
+  },
+  trombina_exp: {
+    id: "trombina_exp",
+    name: "Trombina",
+    short: "trombina",
+    pdb: "1PPB",
+    color: 16756879,
+    role: "Enzima da coagula\xE7\xE3o: ajuda a formar co\xE1gulos no sangue.",
+    cavities: [{ size: 2, chem: "neg" }, { size: 1, chem: "oil" }, { size: 2, chem: "polar" }, { size: 3, chem: "oil" }],
+    anchor: 0,
+    switchCavity: -1,
+    effect: "Formando co\xE1gulo",
+    word: "Co\xE1gulo!"
+  },
+  beta2_exp: {
+    id: "beta2_exp",
+    name: "Receptor \u03B22",
+    short: "receptor \u03B22",
+    pdb: "2RH1",
+    color: 9423103,
+    role: "Receptor na parede da c\xE9lula. Ligado, manda a c\xE9lula do pulm\xE3o relaxar.",
+    cavities: [{ size: 1, chem: "neg" }, { size: 3, chem: "oil" }, { size: 2, chem: "polar" }, { size: 2, chem: "oil" }, { size: 1, chem: "polar" }],
+    anchor: 0,
+    switchCavity: 2,
+    effect: "Recado enviado",
+    word: "Ligou!",
+    sideTilt: 40
+  },
   beta2: {
     id: "beta2",
     name: "Receptor \u03B22",
@@ -236,11 +391,11 @@ var LEVELS = [
     seconds: 90,
     intro: 'O receptor \u03B22 atravessa a membrana da c\xE9lula. O bolso fica do lado de FORA. Quando o mensageiro natural encaixa e aperta o "interruptor" (anel tracejado), um recado passa para DENTRO da c\xE9lula.',
     goal: "Encontre a mol\xE9cula que ocupa o receptor SEM apertar o interruptor, para o recado parar.",
-    targets: ["beta2"],
-    tray: ["gota", "raio2", "cometa", "pluma", "escudo"],
-    natural: "mensageiro",
+    targets: ["beta2_facil"],
+    tray: ["gota", "raio_f", "folha", "grao", "escudo_f"],
+    natural: "mensageiro_f",
     turnOnly: true,
-    learned: "Mol\xE9culas que encaixam e LIGAM o receptor se chamam agonistas. As que encaixam e s\xF3 BLOQUEIAM se chamam antagonistas. As duas encaixam, mas fazem coisas opostas! A Escudo tem a ponta que gosta de \xE1gua curtinha demais: n\xE3o alcan\xE7a o interruptor."
+    learned: "Mol\xE9culas que encaixam e LIGAM o receptor se chamam agonistas (a Raio). As que encaixam e s\xF3 BLOQUEIAM se chamam antagonistas (a Escudo). As duas encaixam, mas fazem coisas opostas! A Escudo tem a ponta que gosta de \xE1gua curtinha demais: n\xE3o alcan\xE7a o interruptor."
   },
   {
     id: 3,
@@ -286,34 +441,8 @@ var LEVELS = [
   {
     id: 13,
     tier: "padrao",
-    kind: "activate",
-    title: "Fase 3 \xB7 Ligue o receptor",
-    seconds: 90,
-    intro: "Agora \xE9 o contr\xE1rio: queremos que o receptor \u03B22 mande o recado, como faz o mensageiro natural.",
-    goal: "Encaixe FORTE e aperte o interruptor do receptor \u03B22.",
-    targets: ["beta2"],
-    tray: ["escudo", "pluma", "raio", "faisca", "gota"],
-    natural: "mensageiro",
-    learned: "A Raio encaixa e aperta o interruptor: \xE9 um agonista, faz o mesmo que o mensageiro natural."
-  },
-  {
-    id: 14,
-    tier: "padrao",
-    kind: "block",
-    title: "Fase 4 \xB7 Trave a trombina",
-    seconds: 90,
-    intro: "A trombina ajuda o sangue a coagular. O bolso dela parece com o da tripsina, mas tem DOIS buracos oleosos.",
-    goal: "Encaixe FORTE no bolso da trombina.",
-    targets: ["trombina"],
-    tray: ["cometa", "gota", "trevo", "faisca", "pluma"],
-    natural: "substrato",
-    learned: "A Trevo tem duas partes oleosas, uma grande e uma m\xE9dia: combina com os dois buracos oleosos da trombina."
-  },
-  {
-    id: 15,
-    tier: "padrao",
     kind: "selective",
-    title: "Fase 5 \xB7 A mol\xE9cula que escolhe",
+    title: "Fase 3 \xB7 A mol\xE9cula que escolhe",
     seconds: 100,
     intro: 'Trombina e tripsina s\xE3o enzimas "primas": os bolsos s\xE3o parecidos. Queremos travar a trombina (coagula\xE7\xE3o) sem atrapalhar a tripsina (digest\xE3o).',
     goal: "Trave a TROMBINA e deixe a TRIPSINA livre. A mol\xE9cula testa as duas ao mesmo tempo.",
@@ -322,55 +451,43 @@ var LEVELS = [
     blockTarget: "trombina",
     learned: "Mol\xE9culas SELETIVAS encaixam bem s\xF3 no alvo certo. A Trevo tem uma parte m\xE9dia oleosa que cabe no bolsinho da trombina, mas \xE9 grande demais para o da tripsina. Menos efeitos indesejados!"
   },
-  // ------------------------------------------------------------------ Especialista
+  // ------------------------------------------------------------------ Especialista (4 and 5 contact points)
   {
     id: 21,
     tier: "especialista",
     kind: "best",
-    title: "Fase 1 \xB7 O melhor encaixe",
-    seconds: 120,
-    intro: "V\xE1rias mol\xE9culas encaixam forte na tripsina. Num projeto de f\xE1rmaco, escolhemos a de MAIOR afinidade. Aqui cada encaixe recebe uma nota de 0 a 100.",
-    goal: "Encontre a mol\xE9cula com a MAIOR nota de encaixe na tripsina.",
-    targets: ["tripsina"],
-    tray: ["escudo", "seta", "cometa", "raio", "gota", "trevo"],
-    learned: "Escudo, Seta e Cometa encaixam forte, mas s\xF3 a Cometa preenche os tr\xEAs buracos com o tamanho e a qu\xEDmica exatos (nota 100). \xC9 o mesmo racioc\xEDnio de ordenar mol\xE9culas por pontua\xE7\xE3o num docking virtual."
+    title: "Fase 1 \xB7 Quatro sub-bolsos",
+    seconds: 150,
+    intro: "Rem\xE9dios de verdade tocam v\xE1rios sub-bolsos da enzima ao mesmo tempo. Aqui o bolso da tripsina tem QUATRO (S1 a S4) e as mol\xE9culas t\xEAm quatro pontas. V\xE1rias encaixam forte: cada encaixe ganha uma nota de 0 a 100.",
+    goal: "Encontre a mol\xE9cula com a MAIOR nota de encaixe nos quatro sub-bolsos da tripsina.",
+    targets: ["tripsina_exp"],
+    tray: ["cruz", "tranca", "estrela", "garra", "helice", "polvo"],
+    learned: "Cruz e H\xE9lice encaixam forte, mas sobra espa\xE7o em um sub-bolso (nota 95). A Tran\xE7a tem as mesmas pontas da Estrela em outra ordem: a ORDEM ao redor do anel importa. S\xF3 a Estrela preenche os quatro sub-bolsos com tamanho e qu\xEDmica exatos (nota 100)."
   },
   {
     id: 22,
     tier: "especialista",
-    kind: "activate",
-    title: "Fase 2 \xB7 Agonista entre impostores",
-    seconds: 120,
-    intro: "Seis mol\xE9culas parecidas. V\xE1rias escorregam, uma encaixa mas s\xF3 bloqueia. Apenas uma LIGA o receptor \u03B22.",
-    goal: "Encontre o agonista: encaixe forte que aperta o interruptor do \u03B22.",
-    targets: ["beta2"],
-    tray: ["escudo", "cometa", "raio", "faisca", "pluma", "gota"],
-    learned: "O interruptor s\xF3 \xE9 apertado quando a parte que gosta de \xE1gua tem o tamanho EXATO do buraco. A Escudo encaixa t\xE3o bem quanto, mas sem ativar: antagonista."
+    kind: "block",
+    title: "Fase 2 \xB7 Cinco pontos no receptor",
+    seconds: 150,
+    intro: "O bolso do receptor \u03B22 tem CINCO pontos de contato: a \xE2ncora negativa (Asp113), um grupo oleoso grande, o interruptor (serinas da h\xE9lice 5), um ponto oleoso m\xE9dio e um pequeno que gosta de \xE1gua. Tr\xEAs mol\xE9culas encaixam forte. S\xF3 uma bloqueia.",
+    goal: "Ocupe os cinco pontos do \u03B22 SEM apertar o interruptor.",
+    targets: ["beta2_exp"],
+    tray: ["farol", "leque", "coroa", "martelo", "flor", "sombra"],
+    learned: "Farol e Flor encaixam e apertam o interruptor: agonistas. A Coroa encaixa nos cinco pontos, mas a ponta do meio \xE9 pequena demais para o interruptor: antagonista. Uma \xFAnica ponta decide entre ligar e bloquear."
   },
   {
     id: 23,
     tier: "especialista",
-    kind: "best",
-    title: "Fase 3 \xB7 O melhor na trombina",
-    seconds: 120,
-    intro: "Na trombina, mais de uma mol\xE9cula encaixa forte. Compare as notas de encaixe.",
-    goal: "Encontre a mol\xE9cula com a MAIOR nota de encaixe na trombina.",
-    targets: ["trombina"],
-    tray: ["cometa", "seta", "trevo", "escudo", "nuvem", "gigante"],
-    learned: "A Seta encaixa forte, mas a pontinha oleosa sobra no buraco m\xE9dio. A Trevo preenche os dois buracos oleosos por inteiro: nota 100."
-  },
-  {
-    id: 24,
-    tier: "especialista",
     kind: "selective",
-    title: "Fase 4 \xB7 Seletividade fina",
-    seconds: 120,
-    intro: "Agora v\xE1rias mol\xE9culas grudam nas DUAS enzimas. Pense no buraco que \xE9 diferente entre elas.",
+    title: "Fase 3 \xB7 Seletividade nos sub-bolsos",
+    seconds: 150,
+    intro: "Tripsina e trombina t\xEAm os mesmos sub-bolsos S1 e S3. A diferen\xE7a est\xE1 no S2 (pequeno na trombina) e no S4 (grande e oleoso na trombina). A mol\xE9cula testa as duas enzimas ao mesmo tempo.",
     goal: "Trave a TROMBINA e deixe a TRIPSINA totalmente livre.",
-    targets: ["tripsina", "trombina"],
-    tray: ["cometa", "seta", "trevo", "escudo", "faisca", "gigante"],
-    blockTarget: "trombina",
-    learned: "Cometa, Seta e Escudo cabem no buraco pequeno da tripsina: grudam nas duas enzimas. S\xF3 a Trevo, com a parte m\xE9dia oleosa, \xE9 grande demais para a tripsina. Seletividade vem de explorar a diferen\xE7a entre os bolsos."
+    targets: ["tripsina_exp", "trombina_exp"],
+    tray: ["estrela", "ponte", "tranca", "polvo", "garra", "cruz"],
+    blockTarget: "trombina_exp",
+    learned: "A Ponte gruda nas duas enzimas. Estrela e Cruz n\xE3o cabem no S2 pequeno da trombina. A Polvo tem a ponta oleosa pequena para o S2 e a GRANDE para o S4 da trombina, que n\xE3o cabe no S4 da tripsina: \xE9 seletiva. Anticoagulantes seletivos de verdade exploram diferen\xE7as como essas."
   },
   // ------------------------------------------------------------------ free lab bench
   {
@@ -406,16 +523,16 @@ var t = (s, p) => {
 };
 
 // src/game/rules.ts
-var PERMS = [
-  [0, 1, 2],
-  [1, 2, 0],
-  [2, 0, 1],
-  // rotations
-  [0, 2, 1],
-  [2, 1, 0],
-  [1, 0, 2]
-  // flipped
-];
+function permsFor(n) {
+  const out = [];
+  for (let k = 0; k < n; k++) out.push(Array.from({ length: n }, (_, j) => (j + k) % n));
+  for (let m = 0; m < n; m++) {
+    const k = (n - m) % n;
+    out.push(Array.from({ length: n }, (_, j) => (k - j + n) % n));
+  }
+  return out;
+}
+var PERMS = permsFor(3);
 var THRESHOLDS = { strong: 0.78, weak: 0.45 };
 var isCharge = (c) => c === "pos" || c === "neg";
 function scoreSlot(cavity, group) {
@@ -524,7 +641,8 @@ function cavityAdj(size) {
 }
 function evaluateTurnOnly(mol, target, perm) {
   const a = evaluate(mol, target, perm);
-  const b = evaluate(mol, target, [perm[0], perm[2], perm[1]]);
+  const n = perm.length;
+  const b = evaluate(mol, target, perm.map((_, c) => perm[(n - c) % n]));
   return rank(b.fit) > rank(a.fit) || rank(b.fit) === rank(a.fit) && b.affinity > a.affinity ? b : a;
 }
 var RANK = { clash: 0, repel: 0, slip: 1, weak: 2, strong: 3 };
@@ -532,8 +650,9 @@ function rank(fit) {
   return RANK[fit];
 }
 function bestFit(mol, target) {
-  let best = evaluate(mol, target, PERMS[0]);
-  for (const p of PERMS.slice(1)) {
+  const perms = permsFor(target.cavities.length);
+  let best = evaluate(mol, target, perms[0]);
+  for (const p of perms.slice(1)) {
     const r = evaluate(mol, target, p);
     if (rank(r.fit) > rank(best.fit) || rank(r.fit) === rank(best.fit) && r.affinity > best.affinity) best = r;
   }
@@ -541,8 +660,11 @@ function bestFit(mol, target) {
 }
 
 // src/game/challenges.ts
-function validPerm(p) {
-  return Array.isArray(p) && p.length === 3 && PERMS.some((q) => q[0] === p[0] && q[1] === p[1] && q[2] === p[2]);
+function armsOf(level) {
+  return TARGETS[level.targets[0]].cavities.length;
+}
+function validPerm(p, n = 3) {
+  return Array.isArray(p) && p.length === n && permsFor(n).some((q) => q.every((x, i) => x === p[i]));
 }
 function dropFit(level, molId, perm, targetIndex = 0) {
   const mol = MOLECULES[molId];
@@ -595,6 +717,7 @@ export {
   TEAM_COLORS,
   TEAM_NAMES,
   TIERS,
+  armsOf,
   bestAffinity,
   challengeList,
   dropFit,
