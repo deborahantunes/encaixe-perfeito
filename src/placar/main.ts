@@ -120,7 +120,7 @@ function statusPill(): void {
 }
 
 function keyOf(s: RoomState | null): string {
-  if (!client || !s) return `none|${serverOk}|${client?.status ?? ''}`
+  if (!client || !s) return `none|${serverOk}|${client?.status ?? ''}|${(client?.failures ?? 0) >= 3}`
   return [s.phase, s.round, s.tier, s.count, s.levelId, s.teams.map(x => `${x.claimed ? 1 : 0}${x.online ? 1 : 0}`).join('')].join('|')
 }
 
@@ -149,12 +149,14 @@ function render(): void {
 }
 
 function connectHtml(): string {
+  // The room server does not answer: stop waiting and say so.
+  if (client && client.failures >= 3 && !client.state) { client.close(); client = null; serverOk = false }
   const busy = serverOk === null || (client && client.status !== 'open')
   return `<div class="connect card">
     <h1>${t('Desafio em grupo')}</h1>
     <p>${t('Até 4 óculos jogam os mesmos desafios ao mesmo tempo. Esta tela mostra o código da sala, o que cada time está fazendo e o placar. Ligue-a no projetor.')}</p>
     <button class="btn big" data-act="create" ${busy ? 'disabled' : ''}>${client ? t('Conectando...') : serverOk === null ? t('Acordando o servidor...') : t('Criar sala')}</button>
-    <p class="msg">${serverOk === false ? t('Não foi possível falar com o servidor. Confira a internet e tente de novo.') : esc(message)}</p>
+    <p class="msg">${serverOk === false ? `${t('Não foi possível falar com o servidor. Confira a internet e tente de novo.')} ${t('Se continuar, o servidor ainda não foi instalado (veja o README, "Desafio em grupo").')}<br><small>${esc(httpUrl(server))}</small>` : esc(message)}</p>
     ${serverOk === false ? `<button class="btn ghost" data-act="wake">${t('Tentar de novo')}</button>` : ''}
     <p>${t('Na primeira vez do dia o servidor pode levar até 1 minuto para acordar.')}</p>
     <details><summary>${t('Servidor (avançado)')}</summary><input data-k="server" value="${esc(server)}" spellcheck="false"></details>

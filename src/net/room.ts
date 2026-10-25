@@ -82,6 +82,8 @@ export class RoomClient {
   private resume = ''
   private closed = false
   private tries = 0
+  /** Failed connection attempts in a row (0 once connected). */
+  get failures(): number { return this.tries }
   private pingTimer = 0
   private retryTimer = 0
 

@@ -661,6 +661,19 @@ export class Game {
       ctx.textAlign = 'right'
       ctx.fillText(room.status === 'closed' ? t('Desconectado') : t('Conectando...'), w - 60, 172)
       ctx.textAlign = 'left'
+      if (room.failures >= 3 && !room.state) {
+        // No answer from the room server: say so instead of waiting forever.
+        ctx.fillStyle = '#ff9db5'
+        ctx.font = font(34, 'bold')
+        let yy = wrapText(ctx, t('Não foi possível falar com o servidor do Desafio em grupo.'), 60, 280, w - 120, 44, 2)
+        ctx.fillStyle = '#d8d3f5'
+        ctx.font = font(30)
+        yy = wrapText(ctx, t('Confira a internet do óculos. Se continuar, o servidor ainda não está no ar: avise quem organiza o desafio.'), 60, yy + 10, w - 120, 40, 3)
+        ctx.fillStyle = '#9a93c9'
+        ctx.font = font(24)
+        ctx.fillText(room.server.replace(/^wss?:\/\//, ''), 60, yy + 10)
+        return
+      }
     }
     const center = (text: string, y: number, px: number, color = '#ffffff', weight: 'bold' | 'normal' = 'bold') => {
       ctx.textAlign = 'center'; ctx.fillStyle = color; fitFont(ctx, text, w - 120, px, weight); ctx.fillText(text, w / 2, y); ctx.textAlign = 'left'
